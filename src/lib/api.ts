@@ -51,11 +51,17 @@ export async function analyze(fileId: string) {
 /* ---------------------------------------------------------
    3. GENERATE LEARNING PLAN
 --------------------------------------------------------- */
-export async function generatePlan(fileId: string, days: number) {
+export async function generatePlan(
+  fileId: string,
+  days: number,
+  language: string
+) {
   return jsonFetch(
     `${API_URL}/studyplan/study?file_id=${encodeURIComponent(
       fileId
-    )}&days=${encodeURIComponent(String(days))}`,
+    )}&days=${encodeURIComponent(String(days))}&lang=${encodeURIComponent(
+      language
+    )}`,
     { method: "POST" }
   );
 }

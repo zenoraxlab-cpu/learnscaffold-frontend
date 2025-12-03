@@ -82,7 +82,6 @@ export default function HomePage() {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
   const isBusy =
@@ -91,8 +90,8 @@ export default function HomePage() {
     status === 'generating';
 
   /* ---------------------------------------------------------
-     GENERATION TIMER — FIXED VERSION
---------------------------------------------------------- */
+     GENERATION TIMER
+  --------------------------------------------------------- */
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -107,7 +106,7 @@ export default function HomePage() {
     }
 
     return () => {
-      if (timer !== null) clearInterval(timer);
+      if (timer) clearInterval(timer);
     };
   }, [status]);
 
@@ -124,6 +123,7 @@ export default function HomePage() {
 
         if (st?.status) {
           setAnalysisStatus(st.status);
+
           if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
             setAnalysisProgress(prev =>
               Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
@@ -149,7 +149,7 @@ export default function HomePage() {
   }, [fileId, status]);
 
   /* ---------------------------------------------------------
-     SOFT PROGRESS
+     SOFT PROGRESS BAR
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -166,7 +166,6 @@ export default function HomePage() {
             : prev;
 
         if (target > prev) return target;
-
         if (!key || target < 85) return Math.min(prev + 2, 85);
 
         return prev;
@@ -182,15 +181,16 @@ export default function HomePage() {
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
+
     setError(null);
     setPlan(null);
-    setFileId(null);
     setAnalysis(null);
+    setFileId(null);
     setEditableText('');
-    setAnalysisStatus(null);
-    setAnalysisProgress(0);
     setRecommendedDays(null);
     setDays(7);
+    setAnalysisStatus(null);
+    setAnalysisProgress(0);
     setPlanLanguage('en');
     setStatus('idle');
 
@@ -207,8 +207,8 @@ export default function HomePage() {
         setAnalysisProgress(STATUS_PROGRESS_MAP.uploaded);
 
         setStatus('analyzing');
-        const res = await analyze(uploadRes.file_id);
 
+        const res = await analyze(uploadRes.file_id);
         setAnalysis(res.analysis);
 
         const rec =
@@ -240,6 +240,7 @@ export default function HomePage() {
       setStatus('generating');
 
       const generated = await generatePlan(fileId, days, planLanguage);
+
       setPlan(generated);
       setEditableText(planToText(generated));
 
@@ -260,6 +261,7 @@ export default function HomePage() {
 
     try {
       setIsDownloading(true);
+
       const blob = await downloadPlanPdf(editableText, fileId, days);
 
       const url = window.URL.createObjectURL(blob);
@@ -279,13 +281,10 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     UI RENDER
+     UI
   --------------------------------------------------------- */
 
   const dots = useDots();
-
-  const isAnalyzingUI =
-    status === 'uploading' || status === 'analyzing';
 
   const statusKey = analysisStatus || status || 'idle';
   const baseLabel = STATUS_LABELS[statusKey] || statusKey;
@@ -295,7 +294,6 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
-
         <header className="mb-8 flex items-center justify-between">
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
@@ -363,7 +361,13 @@ export default function HomePage() {
    COMPONENTS
 --------------------------------------------------------- */
 
-function Stepper({ selectedFile, analysis, plan }) {
+interface StepperProps {
+  selectedFile: File | null;
+  analysis: AnalysisBlock | null;
+  plan: StudyPlanResponse | null;
+}
+
+function Stepper({ selectedFile, analysis, plan }: StepperProps) {
   return (
     <div className="mb-6 flex items-center gap-3 text-xs text-slate-300">
       <StepBadge active number={1} label="Upload file" />
@@ -375,16 +379,27 @@ function Stepper({ selectedFile, analysis, plan }) {
   );
 }
 
+interface UploadSectionProps {
+  status: 'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error';
+  analysisStatus: string | null;
+  analysisProgress: number;
+  error: string | null;
+  fileId: string | null;
+  isBusy: boolean;
+  handleFileSelected: (file: File) => void;
+  uiLabel: string;
+}
+
 function UploadSection({
   status,
-  analysisStatus,
+  analysisStatus, // оставляем для будущих доработок, даже если сейчас не используется
   analysisProgress,
   error,
   fileId,
   isBusy,
   handleFileSelected,
   uiLabel,
-}) {
+}: UploadSectionProps) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
       <h1 className="text-2xl font-semibold tracking-tight">
@@ -415,6 +430,21 @@ function UploadSection({
   );
 }
 
+interface AnalysisSectionProps {
+  analysis: AnalysisBlock;
+  recommendedDays: number | null;
+  setDays: (value: number) => void;
+  days: number;
+  planLanguage: string;
+  setPlanLanguage: (lang: string) => void;
+  status: 'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error';
+  generationProgress: number;
+  remainingSeconds: number;
+  fileId: string | null;
+  isBusy: boolean;
+  onGenerate: () => void;
+}
+
 function AnalysisSection({
   analysis,
   recommendedDays,
@@ -428,7 +458,7 @@ function AnalysisSection({
   fileId,
   isBusy,
   onGenerate,
-}) {
+}: AnalysisSectionProps) {
   const dots = useDots();
 
   return (
@@ -529,6 +559,16 @@ function AnalysisSection({
   );
 }
 
+interface FinalPlanSectionProps {
+  plan: StudyPlanResponse;
+  editableText: string;
+  setEditableText: (text: string) => void;
+  isBusy: boolean;
+  isDownloading: boolean;
+  onDownload: () => void;
+  fileId: string | null;
+}
+
 function FinalPlanSection({
   plan,
   editableText,
@@ -537,7 +577,7 @@ function FinalPlanSection({
   isDownloading,
   onDownload,
   fileId,
-}) {
+}: FinalPlanSectionProps) {
   return (
     <>
       <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
@@ -587,7 +627,13 @@ function FinalPlanSection({
   );
 }
 
-function LabelBlock({ title, children, className = '' }) {
+interface LabelBlockProps {
+  title: string;
+  children?: React.ReactNode;
+  className?: string;
+}
+
+function LabelBlock({ title, children, className = '' }: LabelBlockProps) {
   return (
     <div className={className}>
       <div className="text-[11px] uppercase tracking-wide text-sky-300/80">
@@ -598,7 +644,13 @@ function LabelBlock({ title, children, className = '' }) {
   );
 }
 
-function StepBadge({ active, number, label }) {
+interface StepBadgeProps {
+  active: boolean;
+  number: number;
+  label: string;
+}
+
+function StepBadge({ active, number, label }: StepBadgeProps) {
   return (
     <div className="flex items-center gap-2">
       <div
@@ -618,7 +670,11 @@ function StepBadge({ active, number, label }) {
   );
 }
 
-function StepLine({ active }) {
+interface StepLineProps {
+  active: boolean;
+}
+
+function StepLine({ active }: StepLineProps) {
   return (
     <div
       className={
@@ -664,12 +720,12 @@ function planToText(plan: StudyPlanResponse): string {
   }
 
   lines.push('');
+
   for (const day of plan.plan.days) {
     lines.push(`Day ${day.day_number}. ${day.title}`);
 
     const pagesLabel = formatPagesForText(day.source_pages);
     if (pagesLabel) lines.push(`Pages: ${pagesLabel}`);
-
     lines.push('');
 
     if (day.goals?.length) {
