@@ -1,96 +1,109 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://learnscaffold-backend.onrender.com";
+  "https://learnscaffold-backend-ocr.onrender.com";
 
 /* ---------------------------------------------------------
-   Helper: unified fetch with JSON parsing
+   UPLOAD FILE
 --------------------------------------------------------- */
-async function jsonFetch(url: string, options: RequestInit = {}) {
-  const res = await fetch(url, {
-    ...options,
-    cache: "no-store",
-  });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Request failed: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
-/* ---------------------------------------------------------
-   1. UPLOAD FILE
---------------------------------------------------------- */
 export async function uploadStudyFile(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
+  const form = new FormData();
+  form.append("file", file);
 
   const res = await fetch(`${API_URL}/upload/`, {
     method: "POST",
-    body: formData,
+    body: form,
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Upload failed: ${res.status} ${text}`);
+    throw new Error(`Upload failed (${res.status})`);
   }
 
   return res.json();
 }
 
 /* ---------------------------------------------------------
-   2. ANALYZE FILE
+   START ANALYSIS
 --------------------------------------------------------- */
+
 export async function analyze(fileId: string) {
-  return jsonFetch(`${API_URL}/analyze/?file_id=${encodeURIComponent(fileId)}`, {
+  const res = await fetch(`${API_URL}/analyze/`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId }),
   });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Analyze failed (${res.status}): ${txt}`);
+  }
+
+  return res.json();
 }
 
 /* ---------------------------------------------------------
-   3. GENERATE LEARNING PLAN
+   POLL STATUS
 --------------------------------------------------------- */
+
+export async function getAnalysisStatus(fileId: string) {
+  const res = await fetch(`${API_URL}/analyze/status/${fileId}`);
+
+  if (!res.ok) {
+    throw new Error("Failed to get analysis status");
+  }
+
+  return res.json();
+}
+
+/* ---------------------------------------------------------
+   GENERATE LEARNING PLAN
+--------------------------------------------------------- */
+
 export async function generatePlan(
   fileId: string,
   days: number,
   language: string
 ) {
-  return jsonFetch(
-    `${API_URL}/studyplan/study?file_id=${encodeURIComponent(
-      fileId
-    )}&days=${encodeURIComponent(String(days))}&lang=${encodeURIComponent(
-      language
-    )}`,
-    { method: "POST" }
-  );
+  const res = await fetch(`${API_URL}/generate/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      file_id: fileId,
+      days,
+      language,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Generate failed (${res.status}): ${txt}`);
+  }
+
+  return res.json();
 }
 
 /* ---------------------------------------------------------
-   4. DOWNLOAD PDF
+   DOWNLOAD PDF
 --------------------------------------------------------- */
+
 export async function downloadPlanPdf(
   text: string,
   fileId: string,
   days: number
-): Promise<Blob> {
-  const res = await fetch(`${API_URL}/plan/pdf/${fileId}?days=${days}`, {
+) {
+  const res = await fetch(`${API_URL}/plan/pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      file_id: fileId,
+      days,
+      text,
+    }),
   });
 
   if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    throw new Error(`PDF download failed: ${res.status} ${msg}`);
+    throw new Error("PDF generation failed");
   }
 
   return res.blob();
-}
-
-/* ---------------------------------------------------------
-   5. GET ANALYSIS STATUS
---------------------------------------------------------- */
-export async function getAnalysisStatus(fileId: string) {
-  return jsonFetch(`${API_URL}/analyze/status/${encodeURIComponent(fileId)}`);
 }
