@@ -91,7 +91,7 @@ export default function HomePage() {
     status === 'generating';
 
   /* ---------------------------------------------------------
-   GENERATION TIMER — FIXED VERSION
+     GENERATION TIMER — FIXED VERSION
 --------------------------------------------------------- */
 
   useEffect(() => {
@@ -107,9 +107,7 @@ export default function HomePage() {
     }
 
     return () => {
-      if (timer !== null) {
-        clearInterval(timer);
-      }
+      if (timer !== null) clearInterval(timer);
     };
   }, [status]);
 
@@ -127,7 +125,7 @@ export default function HomePage() {
         if (st?.status) {
           setAnalysisStatus(st.status);
           if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
-            setAnalysisProgress((prev) =>
+            setAnalysisProgress(prev =>
               Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
             );
           }
@@ -157,10 +155,10 @@ export default function HomePage() {
   useEffect(() => {
     if (status !== 'analyzing') return;
 
-    setAnalysisProgress((prev) => (prev < 5 ? 5 : prev));
+    setAnalysisProgress(prev => (prev < 5 ? 5 : prev));
 
     const timer = setInterval(() => {
-      setAnalysisProgress((prev) => {
+      setAnalysisProgress(prev => {
         const key = analysisStatus;
         const target =
           key && STATUS_PROGRESS_MAP[key] !== undefined
@@ -342,7 +340,6 @@ export default function HomePage() {
         )}
 
         {plan && (
-<<<<<<< HEAD
           <FinalPlanSection
             plan={plan}
             editableText={editableText}
@@ -352,73 +349,6 @@ export default function HomePage() {
             onDownload={handleDownloadPdf}
             fileId={fileId}
           />
-=======
-          <>
-            <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
-              <p className="text-xs uppercase tracking-wide text-emerald-300/80">
-                Learning plan
-              </p>
-              <h2 className="mt-1 text-lg font-semibold">
-                Day-by-day structure
-              </h2>
-              <p className="mt-2 text-sm text-emerald-100/90">
-                Below is a structured plan. Each day contains goals, theory,
-                practice, review questions and, where possible, references to
-                pages of the original PDF.
-              </p>
-
-              <div className="mt-4 rounded-2xl bg-black/20 p-4">
-                <StudyPlanViewer plan={plan} />
-              </div>
-            </section>
-
-            <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-base font-semibold">
-                Editable learning plan text
-              </h2>
-              <p className="mt-2 text-xs text-slate-300">
-                The text below is built from the day-by-day plan. You can edit
-                it, add comments, translations, and more. The PDF is generated
-                exactly from this text.
-              </p>
-
-              <textarea
-                className="mt-3 h-80 w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm leading-relaxed text-slate-900 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                value={editableText}
-                onChange={(e) => setEditableText(e.target.value)}
-              />
-
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={handleDownloadPdf}
-                  disabled={
-                    !editableText.trim() ||
-                    !fileId ||
-                    isBusy ||
-                    isDownloading
-                  }
-                  className={[
-                    'rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-wide',
-                    !editableText.trim() ||
-                    !fileId ||
-                    isBusy ||
-                    isDownloading
-                      ? 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500'
-                      : 'border-emerald-500 bg-emerald-500 text-slate-950 hover:bg-emerald-400',
-                  ].join(' ')}
-                >
-                  {isDownloading ? 'Generating PDF...' : 'Download PDF'}
-                </button>
-
-                <p className="text-[11px] text-slate-500">
-                  The PDF is generated on the server from the current text
-                  (including all of your edits).
-                </p>
-              </div>
-            </section>
-          </>
->>>>>>> b4cec10 (feat: include source pages in editable text and PDF)
         )}
 
         <footer className="mt-auto pt-8 text-xs text-slate-500">
@@ -699,40 +629,20 @@ function StepLine({ active }) {
   );
 }
 
-<<<<<<< HEAD
 /* ---------------------------------------------------------
    PLAN → TEXT
 --------------------------------------------------------- */
 
-=======
-/**
- * Format page ranges for plain-text output.
- */
->>>>>>> b4cec10 (feat: include source pages in editable text and PDF)
 function formatPagesForText(pages?: number[]): string | null {
   if (!pages || pages.length === 0) return null;
 
   const minPage = Math.min(...pages);
   const maxPage = Math.max(...pages);
 
-<<<<<<< HEAD
   if (minPage === maxPage) return `p. ${minPage}`;
   return `pp. ${minPage}–${maxPage}`;
 }
 
-=======
-  if (minPage === maxPage) {
-    return `p. ${minPage}`;
-  }
-
-  return `pp. ${minPage}–${maxPage}`;
-}
-
-/**
- * Build a readable text representation of the learning plan structure,
- * including page references for printing.
- */
->>>>>>> b4cec10 (feat: include source pages in editable text and PDF)
 function planToText(plan: StudyPlanResponse): string {
   const lines: string[] = [];
 
@@ -758,7 +668,6 @@ function planToText(plan: StudyPlanResponse): string {
     lines.push(`Day ${day.day_number}. ${day.title}`);
 
     const pagesLabel = formatPagesForText(day.source_pages);
-<<<<<<< HEAD
     if (pagesLabel) lines.push(`Pages: ${pagesLabel}`);
 
     lines.push('');
@@ -769,22 +678,6 @@ function planToText(plan: StudyPlanResponse): string {
       lines.push('');
     }
 
-=======
-    if (pagesLabel) {
-      lines.push(`Pages: ${pagesLabel}`);
-    }
-
-    lines.push('');
-
-    if (day.goals?.length) {
-      lines.push('Goals');
-      for (const g of day.goals) {
-        lines.push(`- ${g}`);
-      }
-      lines.push('');
-    }
-
->>>>>>> b4cec10 (feat: include source pages in editable text and PDF)
     if (day.theory) {
       lines.push('Theory');
       lines.push(day.theory);
@@ -793,13 +686,7 @@ function planToText(plan: StudyPlanResponse): string {
 
     if (day.practice?.length) {
       lines.push('Practice');
-<<<<<<< HEAD
       day.practice.forEach((p) => lines.push(`- ${p}`));
-=======
-      for (const p of day.practice) {
-        lines.push(`- ${p}`);
-      }
->>>>>>> b4cec10 (feat: include source pages in editable text and PDF)
       lines.push('');
     }
 
@@ -815,11 +702,7 @@ function planToText(plan: StudyPlanResponse): string {
         lines.push(`Question: ${q.q}`);
         lines.push(`Answer: ${q.a}`);
         lines.push('');
-<<<<<<< HEAD
       });
-=======
-      }
->>>>>>> b4cec10 (feat: include source pages in editable text and PDF)
     }
 
     lines.push('---');
