@@ -1,6 +1,3 @@
-// force-rebuild-2025-12-05-01
-// cache-bust-2025-12-05
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -18,11 +15,7 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-import type {
-  StudyPlanResponse,
-  AnalysisBlock,
-  PlanBlock,
-} from '@/types/studyplan';
+import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -91,13 +84,15 @@ export default function HomePage() {
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
+  const [ocrPages, setOcrPages] = useState<{current: number; total: number} | null>(null);
+
   const isBusy =
     status === 'uploading' ||
     status === 'analyzing' ||
     status === 'generating';
 
   /* ---------------------------------------------------------
-     GENERATION TIMER (FIXED CLEANUP)
+     GENERATION TIMER
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -106,31 +101,25 @@ export default function HomePage() {
     if (status === 'generating') {
       setElapsedSeconds(0);
       timer = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        setElapsedSeconds(prev => prev + 1);
       }, 1000);
     } else {
       setElapsedSeconds(0);
     }
 
     return () => {
-      if (timer !== null) {
-        clearInterval(timer);
-      }
+      if (timer) clearInterval(timer);
     };
   }, [status]);
 
   /* ---------------------------------------------------------
-     POLLING BACKEND STATUS (FIXED CLEANUP)
+     BACKEND POLLING WITH OCR SUPPORT
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (!fileId || status !== 'analyzing') return;
 
-    const slowPhases = ['extracting', 'extracting_text', 'classifying'];
-    const pollInterval = slowPhases.includes(analysisStatus || '')
-      ? 3000
-      : 2000;
-
+    const pollInterval = 2000;
     let cancelled = false;
 
     const interval = setInterval(async () => {
@@ -142,10 +131,22 @@ export default function HomePage() {
         if (st?.status) {
           setAnalysisStatus(st.status);
 
-          if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
-            setAnalysisProgress((prev) =>
-              Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
-            );
+          // ---------------- NEW: OCR EXACT PROGRESS ----------------
+          if (st.details?.page_current && st.details?.page_total) {
+            const curr = st.details.page_current;
+            const total = st.details.page_total;
+
+            setOcrPages({ current: curr, total });
+
+            const percent = Math.round((curr / total) * 100);
+            setAnalysisProgress(percent);
+          } else {
+            // fallback — soft progress
+            if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
+              setAnalysisProgress(prev =>
+                Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
+              );
+            }
           }
         }
 
@@ -167,36 +168,7 @@ export default function HomePage() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [fileId, status, analysisStatus]);
-
-  /* ---------------------------------------------------------
-     SOFT PROGRESS BAR (FIXED CLEANUP)
-  --------------------------------------------------------- */
-
-  useEffect(() => {
-    if (status !== 'analyzing') return;
-
-    setAnalysisProgress((prev) => (prev < 5 ? 5 : prev));
-
-    const timer = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        const key = analysisStatus;
-        const target =
-          key && STATUS_PROGRESS_MAP[key] !== undefined
-            ? STATUS_PROGRESS_MAP[key]
-            : prev;
-
-        if (target > prev) return target;
-        if (!key || target < 85) return Math.min(prev + 2, 85);
-
-        return prev;
-      });
-    }, 700);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [status, analysisStatus]);
+  }, [fileId, status]);
 
   /* ---------------------------------------------------------
      FILE UPLOAD & ANALYSIS
@@ -205,7 +177,6 @@ export default function HomePage() {
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
 
-    // Clear previous state
     setError(null);
     setPlan(null);
     setAnalysis(null);
@@ -215,6 +186,7 @@ export default function HomePage() {
     setDays(7);
     setAnalysisStatus(null);
     setAnalysisProgress(0);
+    setOcrPages(null);
     setPlanLanguage('en');
     setStatus('idle');
 
@@ -233,15 +205,10 @@ export default function HomePage() {
         setStatus('analyzing');
 
         const res = await analyze(uploadRes.file_id);
-
-        if (!res?.analysis || !res.analysis.document_type) {
-          throw new Error('Malformed analysis data');
-        }
-
         setAnalysis(res.analysis);
 
         const rec =
-          res.analysis.recommended_days && res.analysis.recommended_days > 0
+          res.analysis?.recommended_days && res.analysis.recommended_days > 0
             ? res.analysis.recommended_days
             : 7;
 
@@ -258,7 +225,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     GENERATE PLAN — FIXED (VALIDATION + NO CRASH)
+     GENERATE PLAN
   --------------------------------------------------------- */
 
   const handleGenerate = async () => {
@@ -269,16 +236,6 @@ export default function HomePage() {
       setStatus('generating');
 
       const generated = await generatePlan(fileId, days, planLanguage);
-
-      if (
-        !generated ||
-        !generated.plan ||
-        !Array.isArray(generated.plan.days)
-      ) {
-        console.error('Invalid plan structure:', generated);
-        setStatus('error');
-        return;
-      }
 
       setPlan(generated);
       setEditableText(planToText(generated));
@@ -292,7 +249,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     PDF DOWNLOAD
+     DOWNLOAD PDF
   --------------------------------------------------------- */
 
   const handleDownloadPdf = async () => {
@@ -302,15 +259,14 @@ export default function HomePage() {
       setIsDownloading(true);
 
       const blob = await downloadPlanPdf(editableText, fileId, days);
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-
       a.href = url;
       a.download = `learnscaffold-plan-${days}-days.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
@@ -321,18 +277,25 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     UI LABELS
+     UI LABEL WITH OCR SUPPORT
   --------------------------------------------------------- */
 
   const dots = useDots();
+
   const statusKey = analysisStatus || status || 'idle';
   const baseLabel = STATUS_LABELS[statusKey] || statusKey;
-  const showDots = !['ready', 'error', 'idle'].includes(statusKey);
-  const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
 
-  /* ---------------------------------------------------------
-     UI COMPOSITION
-  --------------------------------------------------------- */
+  let uiLabel =
+    !['ready', 'error', 'idle'].includes(statusKey) ? `${baseLabel}${dots}` : baseLabel;
+
+  // NEW: if OCR is running → override label
+  if (
+    analysisStatus === 'extracting_text' &&
+    ocrPages?.current &&
+    ocrPages?.total
+  ) {
+    uiLabel = `Extracting text (${ocrPages.current}/${ocrPages.total})`;
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -341,7 +304,7 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Test interface · v0.8.1</div>
+          <div className="text-xs text-slate-400">v0.8.1</div>
         </header>
 
         <Stepper selectedFile={selectedFile} analysis={analysis} plan={plan} />
@@ -355,6 +318,7 @@ export default function HomePage() {
           isBusy={isBusy}
           handleFileSelected={handleFileSelected}
           uiLabel={uiLabel}
+          ocrPages={ocrPages}
         />
 
         {analysis && (
@@ -380,7 +344,7 @@ export default function HomePage() {
           />
         )}
 
-        {plan && plan.plan && Array.isArray(plan.plan.days) && (
+        {plan && (
           <FinalPlanSection
             plan={plan}
             editableText={editableText}
@@ -401,7 +365,7 @@ export default function HomePage() {
 }
 
 /* ---------------------------------------------------------
-   SUPPORTING UI COMPONENTS  
+   COMPONENTS
 --------------------------------------------------------- */
 
 interface StepperProps {
@@ -431,6 +395,7 @@ interface UploadSectionProps {
   isBusy: boolean;
   handleFileSelected: (file: File) => void;
   uiLabel: string;
+  ocrPages: { current: number; total: number } | null;
 }
 
 function UploadSection({
@@ -442,6 +407,7 @@ function UploadSection({
   isBusy,
   handleFileSelected,
   uiLabel,
+  ocrPages,
 }: UploadSectionProps) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
@@ -458,7 +424,17 @@ function UploadSection({
 
       {(status === 'uploading' || status === 'analyzing') && (
         <div className="mt-4">
-          <ProgressBar progress={analysisProgress} status={uiLabel} />
+          <ProgressBar
+            progress={analysisProgress}
+            status={uiLabel}
+          />
+
+          {/* NEW: OCR text below bar */}
+          {ocrPages && analysisStatus === 'extracting_text' && (
+            <p className="mt-1 text-xs text-slate-400">
+              {ocrPages.current}/{ocrPages.total} pages processed
+            </p>
+          )}
         </div>
       )}
 
@@ -552,6 +528,7 @@ function AnalysisSection({
             <LabelBlock title="Plan language" />
             <LanguageSelector
               value={planLanguage}
+              original={analysis.document_language || 'en'}
               onChange={(lang) => setPlanLanguage(lang)}
             />
           </div>
@@ -631,7 +608,7 @@ function FinalPlanSection({
         <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
 
         <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
+          <StudyPlanViewer plan={plan} />
         </div>
       </section>
 
@@ -733,7 +710,7 @@ function StepLine({ active }: StepLineProps) {
 }
 
 /* ---------------------------------------------------------
-   PLAN → TEXT (FIXED practice line)
+   PLAN → TEXT
 --------------------------------------------------------- */
 
 function formatPagesForText(pages?: number[]): string | null {
@@ -754,7 +731,7 @@ function planToText(plan: StudyPlanResponse): string {
   lines.push('');
 
   lines.push(
-    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`
+    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`,
   );
 
   if (plan.analysis.main_topics?.length) {
@@ -789,7 +766,7 @@ function planToText(plan: StudyPlanResponse): string {
 
     if (day.practice?.length) {
       lines.push('Practice');
-      day.practice.forEach((p) => lines.push(`- ${p}`)); // FIXED
+      day.practice.forEach((p) => lines.push(`- ${p}`));
       lines.push('');
     }
 

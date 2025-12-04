@@ -1,19 +1,22 @@
-'use client';
-
-type Props = {
+interface Props {
   value: string;
-  onChange: (v: string) => void;
-};
+  original: string;
+  onChange: (val: string) => void;
+}
 
-export default function LanguageSelector({ value, onChange }: Props) {
+export default function LanguageSelector({ value, original, onChange }: Props) {
   return (
     <select
-      className="rounded-xl border border-slate-600 bg-slate-900 px-3 py-1 text-sm text-slate-100"
+      className="rounded-full border border-slate-500 bg-slate-900 px-3 py-1 text-sm"
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="en">English</option>
-      <option value="ru">Russian</option>
+      <option value="en">English (default)</option>
+      {original !== "en" && (
+        <option value={original}>
+          Original: {original.toUpperCase()}
+        </option>
+      )}
     </select>
   );
 }
