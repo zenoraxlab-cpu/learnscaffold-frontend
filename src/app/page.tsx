@@ -94,7 +94,7 @@ export default function HomePage() {
     status === 'generating';
 
   /* ---------------------------------------------------------
-     GENERATION TIMER
+     GENERATION TIMER (FIXED CLEANUP)
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -103,17 +103,21 @@ export default function HomePage() {
     if (status === 'generating') {
       setElapsedSeconds(0);
       timer = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
+        setElapsedSeconds((prev) => prev + 1);
       }, 1000);
     } else {
       setElapsedSeconds(0);
     }
 
-    return () => timer && clearInterval(timer);
+    return () => {
+      if (timer !== null) {
+        clearInterval(timer);
+      }
+    };
   }, [status]);
 
   /* ---------------------------------------------------------
-     POLLING BACKEND STATUS (FIXED)
+     POLLING BACKEND STATUS (FIXED CLEANUP)
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -136,7 +140,7 @@ export default function HomePage() {
           setAnalysisStatus(st.status);
 
           if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
-            setAnalysisProgress(prev =>
+            setAnalysisProgress((prev) =>
               Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
             );
           }
@@ -163,16 +167,16 @@ export default function HomePage() {
   }, [fileId, status, analysisStatus]);
 
   /* ---------------------------------------------------------
-     SOFT PROGRESS BAR
+     SOFT PROGRESS BAR (FIXED CLEANUP)
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (status !== 'analyzing') return;
 
-    setAnalysisProgress(prev => (prev < 5 ? 5 : prev));
+    setAnalysisProgress((prev) => (prev < 5 ? 5 : prev));
 
     const timer = setInterval(() => {
-      setAnalysisProgress(prev => {
+      setAnalysisProgress((prev) => {
         const key = analysisStatus;
         const target =
           key && STATUS_PROGRESS_MAP[key] !== undefined
@@ -186,7 +190,9 @@ export default function HomePage() {
       });
     }, 700);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+    };
   }, [status, analysisStatus]);
 
   /* ---------------------------------------------------------
@@ -225,7 +231,6 @@ export default function HomePage() {
 
         const res = await analyze(uploadRes.file_id);
 
-        // SAFETY CHECK
         if (!res?.analysis || !res.analysis.document_type) {
           throw new Error('Malformed analysis data');
         }
@@ -250,7 +255,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     GENERATE PLAN — FIXED (robust)
+     GENERATE PLAN — FIXED (VALIDATION + NO CRASH)
   --------------------------------------------------------- */
 
   const handleGenerate = async () => {
@@ -262,7 +267,6 @@ export default function HomePage() {
 
       const generated = await generatePlan(fileId, days, planLanguage);
 
-      // SAFETY VALIDATION
       if (
         !generated ||
         !generated.plan ||
@@ -295,14 +299,15 @@ export default function HomePage() {
       setIsDownloading(true);
 
       const blob = await downloadPlanPdf(editableText, fileId, days);
-
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
+
       a.href = url;
       a.download = `learnscaffold-plan-${days}-days.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
+
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
@@ -317,7 +322,6 @@ export default function HomePage() {
   --------------------------------------------------------- */
 
   const dots = useDots();
-
   const statusKey = analysisStatus || status || 'idle';
   const baseLabel = STATUS_LABELS[statusKey] || statusKey;
   const showDots = !['ready', 'error', 'idle'].includes(statusKey);
@@ -624,7 +628,6 @@ function FinalPlanSection({
         <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
 
         <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          {/* FIX: StudyPlanViewer requires plan.plan.days, so extract PlanBlock */}
           <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
         </div>
       </section>
@@ -727,7 +730,7 @@ function StepLine({ active }: StepLineProps) {
 }
 
 /* ---------------------------------------------------------
-   PLAN → TEXT
+   PLAN → TEXT (FIXED practice line)
 --------------------------------------------------------- */
 
 function formatPagesForText(pages?: number[]): string | null {
@@ -748,7 +751,7 @@ function planToText(plan: StudyPlanResponse): string {
   lines.push('');
 
   lines.push(
-    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`,
+    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`
   );
 
   if (plan.analysis.main_topics?.length) {
@@ -783,7 +786,7 @@ function planToText(plan: StudyPlanResponse): string {
 
     if (day.practice?.length) {
       lines.push('Practice');
-      day.practice.forEach((p) => lines.push(`- {p}`));
+      day.practice.forEach((p) => lines.push(`- ${p}`)); // FIXED
       lines.push('');
     }
 
