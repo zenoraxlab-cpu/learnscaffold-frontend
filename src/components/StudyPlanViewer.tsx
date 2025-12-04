@@ -1,157 +1,123 @@
+'use client';
+
+import React from 'react';
 import type { AnalysisBlock, PlanBlock, PlanDay } from '@/types/studyplan';
 
-type Props = {
-  analysis?: AnalysisBlock | null;
-  plan?: PlanBlock | null;
-};
+interface Props {
+  analysis: AnalysisBlock | null | undefined;
+  plan: PlanBlock | null | undefined;
+}
 
-/**
- * StudyPlanViewer
- * Renders the list of days for the generated study plan.
- * Includes full safety checks to prevent undefined access errors.
- */
 export default function StudyPlanViewer({ analysis, plan }: Props) {
-  // SAFETY: do not render if the structure is not valid
-  if (!analysis || !plan || !Array.isArray(plan.days)) {
-    console.error('StudyPlanViewer: invalid props', { analysis, plan });
-
+  // SAFETY CHECKS — never crash
+  if (!analysis) {
     return (
-      <div className="rounded-md border border-red-400 bg-red-50 p-4 text-red-700">
-        Error: invalid plan structure. Please regenerate the study plan.
+      <div className="text-sm text-slate-400">
+        No analysis data available.
+      </div>
+    );
+  }
+
+  if (!plan || !Array.isArray(plan.days)) {
+    return (
+      <div className="text-sm text-slate-400">
+        No valid plan data available.
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {plan.days.map((day) => (
-        <DayCard key={day.day_number} day={day} />
-      ))}
+    <div className="space-y-6">
+      {/* Document meta */}
+      <div className="rounded-xl bg-slate-800/40 p-4 text-sm">
+        <p>
+          <span className="text-sky-300">Document type:</span>{' '}
+          {analysis.document_type || 'unknown'}
+        </p>
+
+        <p>
+          <span className="text-sky-300">Level:</span>{' '}
+          {analysis.level || 'unknown'}
+        </p>
+
+        {Array.isArray(analysis.main_topics) && (
+          <p>
+            <span className="text-sky-300">Main topics:</span>{' '}
+            {analysis.main_topics.join(', ')}
+          </p>
+        )}
+      </div>
+
+      {/* Days list */}
+      <div className="space-y-4">
+        {plan.days.map((day: PlanDay) => (
+          <div
+            key={day.day_number}
+            className="rounded-xl border border-slate-700 bg-slate-900/50 p-4"
+          >
+            <h3 className="text-base font-semibold text-emerald-300">
+              Day {day.day_number}: {day.title}
+            </h3>
+
+            {day.source_pages && day.source_pages.length > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                Pages: {day.source_pages.join(', ')}
+              </p>
+            )}
+
+            {day.goals && day.goals.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs uppercase text-sky-300">Goals</p>
+                <ul className="list-disc pl-5 text-sm">
+                  {day.goals.map((g, idx) => (
+                    <li key={idx}>{g}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {day.theory && (
+              <div className="mt-3">
+                <p className="text-xs uppercase text-sky-300">Theory</p>
+                <p className="text-sm whitespace-pre-line">{day.theory}</p>
+              </div>
+            )}
+
+            {day.practice && day.practice.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs uppercase text-sky-300">Practice</p>
+                <ul className="list-disc pl-5 text-sm">
+                  {day.practice.map((task, idx) => (
+                    <li key={idx}>{task}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {day.summary && (
+              <div className="mt-3">
+                <p className="text-xs uppercase text-sky-300">Daily summary</p>
+                <p className="text-sm whitespace-pre-line">{day.summary}</p>
+              </div>
+            )}
+
+            {day.quiz && day.quiz.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs uppercase text-sky-300">Review questions</p>
+                <ul className="list-disc pl-5 text-sm">
+                  {day.quiz.map((q, idx) => (
+                    <li key={idx}>
+                      <strong>Q:</strong> {q.q}
+                      <br />
+                      <strong>A:</strong> {q.a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
-}
-
-/* ---------------------------------------------------------
-   DAY CARD
---------------------------------------------------------- */
-
-function DayCard({ day }: { day: PlanDay }) {
-  const pagesLabel = formatPages(day.source_pages);
-
-  const goals = Array.isArray(day.goals) ? day.goals : [];
-  const practice = Array.isArray(day.practice) ? day.practice : [];
-  const quiz = Array.isArray(day.quiz) ? day.quiz : [];
-
-  return (
-    <article className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4 text-sm text-slate-50">
-      {/* HEADER */}
-      <header className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-emerald-300/80">
-            Day {day.day_number}
-          </p>
-          <h3 className="mt-1 text-sm font-semibold text-slate-50">
-            {day.title || 'Untitled lesson'}
-          </h3>
-        </div>
-
-        {pagesLabel && (
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">
-              Pages in textbook
-            </p>
-            <p className="mt-1 text-[11px] text-emerald-200">{pagesLabel}</p>
-            <p className="mt-0.5 text-[10px] text-slate-500">
-              Open these pages in the PDF
-            </p>
-          </div>
-        )}
-      </header>
-
-      {/* GOALS */}
-      {goals.length > 0 && (
-        <Section title="Goals">
-          <ul className="list-disc space-y-1 pl-5">
-            {goals.map((g, i) => (
-              <li key={i}>{g}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* THEORY */}
-      {day.theory && (
-        <Section title="Theory">
-          <p className="leading-relaxed text-slate-100/90">{day.theory}</p>
-        </Section>
-      )}
-
-      {/* PRACTICE */}
-      {practice.length > 0 && (
-        <Section title="Practice">
-          <ul className="list-disc space-y-1 pl-5">
-            {practice.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* SUMMARY */}
-      {day.summary && (
-        <Section title="Daily summary">
-          <p className="leading-relaxed text-slate-100/90">{day.summary}</p>
-        </Section>
-      )}
-
-      {/* QUIZ */}
-      {quiz.length > 0 && (
-        <Section title="Review questions">
-          <ul className="space-y-1">
-            {quiz.map((q, i) => (
-              <li key={i}>
-                <span className="font-semibold">Question:</span> {q.q}
-                <br />
-                <span className="font-semibold">Answer:</span> {q.a}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-    </article>
-  );
-}
-
-/* ---------------------------------------------------------
-   WALL OF SECTIONS
---------------------------------------------------------- */
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mt-3">
-      <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-        {title}
-      </h4>
-      <div className="mt-1 text-[13px] text-slate-100">{children}</div>
-    </section>
-  );
-}
-
-/* ---------------------------------------------------------
-   PAGE FORMATTER
---------------------------------------------------------- */
-
-function formatPages(pages?: number[]): string | null {
-  if (!pages || pages.length === 0) return null;
-
-  const min = Math.min(...pages);
-  const max = Math.max(...pages);
-
-  return min === max ? `p. ${min}` : `pp. ${min}–${max}`;
 }
