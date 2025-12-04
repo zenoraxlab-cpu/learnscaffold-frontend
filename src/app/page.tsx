@@ -608,7 +608,7 @@ function FinalPlanSection({
         <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
 
         <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          <StudyPlanViewer plan={plan} />
+          <StudyPlanViewer plan={{ days: plan.plan }} />
         </div>
       </section>
 
