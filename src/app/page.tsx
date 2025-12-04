@@ -341,7 +341,7 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Test interface · v0.8</div>
+          <div className="text-xs text-slate-400">Test interface · v0.8.1</div>
         </header>
 
         <Stepper selectedFile={selectedFile} analysis={analysis} plan={plan} />
