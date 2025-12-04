@@ -1,6 +1,6 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://learnscaffold-backend-ocr.onrender.com";
+  "https://learnscaffold-backend.onrender.com";
 
 /* ---------------------------------------------------------
    UPLOAD FILE
