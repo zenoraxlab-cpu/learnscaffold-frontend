@@ -84,7 +84,8 @@ export async function generatePlan(
     throw new Error("Invalid JSON from backend");
   }
 
-  console.log("RAW PLAN RESPONSE:", json);
+  console.log("RAW PLAN RESPONSE:", JSON.stringify(json, null, 2));
+
 
   /* ---------------------------------------------------------
      ANALYSIS VALIDATION
