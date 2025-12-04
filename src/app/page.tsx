@@ -1,3 +1,5 @@
+// cache-bust-2025-12-05
+
 'use client';
 
 import { useState, useEffect } from 'react';
