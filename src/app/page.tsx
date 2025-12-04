@@ -111,13 +111,25 @@ export default function HomePage() {
   }, [status]);
 
   /* ---------------------------------------------------------
-     POLLING BACKEND STATUS
+     FIXED — ADAPTIVE POLLING BACKEND STATUS
+     ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (!fileId || status !== 'analyzing') return;
 
+    const pollInterval =
+      analysisStatus === 'extracting' ||
+      analysisStatus === 'extracting_text' ||
+      analysisStatus === 'classifying'
+        ? 3000
+        : 2000;
+
+    let cancelled = false;
+
     const interval = setInterval(async () => {
+      if (cancelled) return;
+
       try {
         const st = await getAnalysisStatus(fileId);
 
@@ -131,25 +143,28 @@ export default function HomePage() {
           }
         }
 
-        if (st.status === 'ready') {
+        if (st?.status === 'ready') {
           clearInterval(interval);
           setStatus('idle');
         }
 
-        if (st.status === 'error') {
+        if (st?.status === 'error') {
           clearInterval(interval);
           setStatus('error');
         }
       } catch (e) {
         console.error('Polling error', e);
       }
-    }, 1000);
+    }, pollInterval);
 
-    return () => clearInterval(interval);
-  }, [fileId, status]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [fileId, status, analysisStatus]);
 
   /* ---------------------------------------------------------
-     SOFT PROGRESS BAR
+     SOFT PROGRESS BAR (оставляем как есть)
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -325,6 +340,7 @@ export default function HomePage() {
             status={status}
             fileId={fileId}
             isBusy={isBusy}
+            onGenerate={handleGenerate}
             generationProgress={Math.min(
               0.95,
               elapsedSeconds / Math.max(20, days * 5),
@@ -333,7 +349,6 @@ export default function HomePage() {
               0,
               Math.round(Math.max(20, days * 5) - elapsedSeconds),
             )}
-            onGenerate={handleGenerate}
           />
         )}
 
@@ -380,7 +395,7 @@ function Stepper({ selectedFile, analysis, plan }: StepperProps) {
 }
 
 interface UploadSectionProps {
-  status: 'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error';
+  status: string;
   analysisStatus: string | null;
   analysisProgress: number;
   error: string | null;
@@ -392,7 +407,7 @@ interface UploadSectionProps {
 
 function UploadSection({
   status,
-  analysisStatus, // оставляем для будущих доработок, даже если сейчас не используется
+  analysisStatus,
   analysisProgress,
   error,
   fileId,
@@ -437,12 +452,12 @@ interface AnalysisSectionProps {
   days: number;
   planLanguage: string;
   setPlanLanguage: (lang: string) => void;
-  status: 'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error';
-  generationProgress: number;
-  remainingSeconds: number;
+  status: string;
   fileId: string | null;
   isBusy: boolean;
   onGenerate: () => void;
+  generationProgress: number;
+  remainingSeconds: number;
 }
 
 function AnalysisSection({
@@ -453,11 +468,11 @@ function AnalysisSection({
   planLanguage,
   setPlanLanguage,
   status,
-  generationProgress,
-  remainingSeconds,
   fileId,
   isBusy,
   onGenerate,
+  generationProgress,
+  remainingSeconds,
 }: AnalysisSectionProps) {
   const dots = useDots();
 
@@ -626,6 +641,10 @@ function FinalPlanSection({
     </>
   );
 }
+
+/* ---------------------------------------------------------
+   COMMON UI BLOCKS
+--------------------------------------------------------- */
 
 interface LabelBlockProps {
   title: string;
