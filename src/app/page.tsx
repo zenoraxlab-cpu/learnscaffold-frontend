@@ -15,7 +15,11 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
+import type {
+  StudyPlanResponse,
+  AnalysisBlock,
+  PlanBlock,
+} from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -105,25 +109,20 @@ export default function HomePage() {
       setElapsedSeconds(0);
     }
 
-    return () => {
-      if (timer) clearInterval(timer);
-    };
+    return () => timer && clearInterval(timer);
   }, [status]);
 
   /* ---------------------------------------------------------
-     FIXED — ADAPTIVE POLLING BACKEND STATUS
-     ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+     POLLING BACKEND STATUS (FIXED)
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (!fileId || status !== 'analyzing') return;
 
-    const pollInterval =
-      analysisStatus === 'extracting' ||
-      analysisStatus === 'extracting_text' ||
-      analysisStatus === 'classifying'
-        ? 3000
-        : 2000;
+    const slowPhases = ['extracting', 'extracting_text', 'classifying'];
+    const pollInterval = slowPhases.includes(analysisStatus || '')
+      ? 3000
+      : 2000;
 
     let cancelled = false;
 
@@ -164,7 +163,7 @@ export default function HomePage() {
   }, [fileId, status, analysisStatus]);
 
   /* ---------------------------------------------------------
-     SOFT PROGRESS BAR (оставляем как есть)
+     SOFT PROGRESS BAR
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -197,6 +196,7 @@ export default function HomePage() {
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
 
+    // Clear previous state
     setError(null);
     setPlan(null);
     setAnalysis(null);
@@ -224,10 +224,16 @@ export default function HomePage() {
         setStatus('analyzing');
 
         const res = await analyze(uploadRes.file_id);
+
+        // SAFETY CHECK
+        if (!res?.analysis || !res.analysis.document_type) {
+          throw new Error('Malformed analysis data');
+        }
+
         setAnalysis(res.analysis);
 
         const rec =
-          res.analysis?.recommended_days && res.analysis.recommended_days > 0
+          res.analysis.recommended_days && res.analysis.recommended_days > 0
             ? res.analysis.recommended_days
             : 7;
 
@@ -244,7 +250,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     GENERATE PLAN
+     GENERATE PLAN — FIXED (robust)
   --------------------------------------------------------- */
 
   const handleGenerate = async () => {
@@ -255,6 +261,17 @@ export default function HomePage() {
       setStatus('generating');
 
       const generated = await generatePlan(fileId, days, planLanguage);
+
+      // SAFETY VALIDATION
+      if (
+        !generated ||
+        !generated.plan ||
+        !Array.isArray(generated.plan.days)
+      ) {
+        console.error('Invalid plan structure:', generated);
+        setStatus('error');
+        return;
+      }
 
       setPlan(generated);
       setEditableText(planToText(generated));
@@ -296,7 +313,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     UI
+     UI LABELS
   --------------------------------------------------------- */
 
   const dots = useDots();
@@ -305,6 +322,10 @@ export default function HomePage() {
   const baseLabel = STATUS_LABELS[statusKey] || statusKey;
   const showDots = !['ready', 'error', 'idle'].includes(statusKey);
   const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
+
+  /* ---------------------------------------------------------
+     UI COMPOSITION
+  --------------------------------------------------------- */
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -352,7 +373,7 @@ export default function HomePage() {
           />
         )}
 
-        {plan && (
+        {plan && plan.plan && Array.isArray(plan.plan.days) && (
           <FinalPlanSection
             plan={plan}
             editableText={editableText}
@@ -373,7 +394,7 @@ export default function HomePage() {
 }
 
 /* ---------------------------------------------------------
-   COMPONENTS
+   SUPPORTING UI COMPONENTS  
 --------------------------------------------------------- */
 
 interface StepperProps {
@@ -603,7 +624,8 @@ function FinalPlanSection({
         <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
 
         <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          <StudyPlanViewer plan={plan} />
+          {/* FIX: StudyPlanViewer requires plan.plan.days, so extract PlanBlock */}
+          <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
         </div>
       </section>
 
@@ -761,7 +783,7 @@ function planToText(plan: StudyPlanResponse): string {
 
     if (day.practice?.length) {
       lines.push('Practice');
-      day.practice.forEach((p) => lines.push(`- ${p}`));
+      day.practice.forEach((p) => lines.push(`- {p}`));
       lines.push('');
     }
 

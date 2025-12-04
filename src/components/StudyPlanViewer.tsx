@@ -1,35 +1,57 @@
-import type { StudyPlanResponse, PlanDay } from '@/types/studyplan';
+import type { AnalysisBlock, PlanBlock, PlanDay } from '@/types/studyplan';
 
 type Props = {
-  plan: StudyPlanResponse;
+  analysis?: AnalysisBlock | null;
+  plan?: PlanBlock | null;
 };
 
-export default function StudyPlanViewer({ plan }: Props) {
+/**
+ * StudyPlanViewer
+ * Renders the list of days for the generated study plan.
+ * Includes full safety checks to prevent undefined access errors.
+ */
+export default function StudyPlanViewer({ analysis, plan }: Props) {
+  // SAFETY: do not render if the structure is not valid
+  if (!analysis || !plan || !Array.isArray(plan.days)) {
+    console.error('StudyPlanViewer: invalid props', { analysis, plan });
+
+    return (
+      <div className="rounded-md border border-red-400 bg-red-50 p-4 text-red-700">
+        Error: invalid plan structure. Please regenerate the study plan.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {plan.plan.days.map((day) => (
+      {plan.days.map((day) => (
         <DayCard key={day.day_number} day={day} />
       ))}
     </div>
   );
 }
 
+/* ---------------------------------------------------------
+   DAY CARD
+--------------------------------------------------------- */
+
 function DayCard({ day }: { day: PlanDay }) {
   const pagesLabel = formatPages(day.source_pages);
 
-  const goals = day.goals ?? [];
-  const practice = day.practice ?? [];
-  const quiz = day.quiz ?? [];
+  const goals = Array.isArray(day.goals) ? day.goals : [];
+  const practice = Array.isArray(day.practice) ? day.practice : [];
+  const quiz = Array.isArray(day.quiz) ? day.quiz : [];
 
   return (
     <article className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4 text-sm text-slate-50">
+      {/* HEADER */}
       <header className="mb-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-wide text-emerald-300/80">
             Day {day.day_number}
           </p>
           <h3 className="mt-1 text-sm font-semibold text-slate-50">
-            {day.title}
+            {day.title || 'Untitled lesson'}
           </h3>
         </div>
 
@@ -38,9 +60,7 @@ function DayCard({ day }: { day: PlanDay }) {
             <p className="text-[10px] uppercase tracking-wide text-slate-400">
               Pages in textbook
             </p>
-            <p className="mt-1 text-[11px] text-emerald-200">
-              {pagesLabel}
-            </p>
+            <p className="mt-1 text-[11px] text-emerald-200">{pagesLabel}</p>
             <p className="mt-0.5 text-[10px] text-slate-500">
               Open these pages in the PDF
             </p>
@@ -48,6 +68,7 @@ function DayCard({ day }: { day: PlanDay }) {
         )}
       </header>
 
+      {/* GOALS */}
       {goals.length > 0 && (
         <Section title="Goals">
           <ul className="list-disc space-y-1 pl-5">
@@ -58,12 +79,14 @@ function DayCard({ day }: { day: PlanDay }) {
         </Section>
       )}
 
+      {/* THEORY */}
       {day.theory && (
         <Section title="Theory">
           <p className="leading-relaxed text-slate-100/90">{day.theory}</p>
         </Section>
       )}
 
+      {/* PRACTICE */}
       {practice.length > 0 && (
         <Section title="Practice">
           <ul className="list-disc space-y-1 pl-5">
@@ -74,12 +97,14 @@ function DayCard({ day }: { day: PlanDay }) {
         </Section>
       )}
 
+      {/* SUMMARY */}
       {day.summary && (
         <Section title="Daily summary">
           <p className="leading-relaxed text-slate-100/90">{day.summary}</p>
         </Section>
       )}
 
+      {/* QUIZ */}
       {quiz.length > 0 && (
         <Section title="Review questions">
           <ul className="space-y-1">
@@ -96,6 +121,10 @@ function DayCard({ day }: { day: PlanDay }) {
     </article>
   );
 }
+
+/* ---------------------------------------------------------
+   WALL OF SECTIONS
+--------------------------------------------------------- */
 
 function Section({
   title,
@@ -114,15 +143,15 @@ function Section({
   );
 }
 
+/* ---------------------------------------------------------
+   PAGE FORMATTER
+--------------------------------------------------------- */
+
 function formatPages(pages?: number[]): string | null {
   if (!pages || pages.length === 0) return null;
 
-  const minPage = Math.min(...pages);
-  const maxPage = Math.max(...pages);
+  const min = Math.min(...pages);
+  const max = Math.max(...pages);
 
-  if (minPage === maxPage) {
-    return `p. ${minPage}`;
-  }
-
-  return `pp. ${minPage}–${maxPage}`;
+  return min === max ? `p. ${min}` : `pp. ${min}–${max}`;
 }

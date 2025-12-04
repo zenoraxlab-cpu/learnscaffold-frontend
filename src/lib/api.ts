@@ -79,7 +79,27 @@ export async function generatePlan(
     throw new Error(`Generate failed (${res.status}): ${txt}`);
   }
 
-  return res.json();
+  const json = await res.json();
+
+  // ---------------------------------------------------------
+  // SAFETY CHECK: Validate backend response structure
+  // ---------------------------------------------------------
+  if (!json || typeof json !== "object") {
+    console.error("Invalid generatePlan response (not an object):", json);
+    throw new Error("Invalid plan response: not an object");
+  }
+
+  if (!json.plan || !Array.isArray(json.plan.days)) {
+    console.error("Invalid plan.days structure:", json);
+    throw new Error("Invalid plan structure: missing 'plan.days'");
+  }
+
+  if (!json.analysis || !json.analysis.document_type) {
+    console.error("Invalid analysis structure:", json);
+    throw new Error("Invalid analysis structure: missing document_type");
+  }
+
+  return json;
 }
 
 /* ---------------------------------------------------------
