@@ -447,7 +447,7 @@ function UploadSection({
       </p>
 
       <div className="mt-6">
-        <FileDropzone onFileUpload={isBusy ? undefined : handleFileSelected} />
+        <FileDropzone onFileUpload={(file) => !isBusy && handleFileSelected(file)} />
       </div>
 
       {(status === 'uploading' || status === 'analyzing') && (
