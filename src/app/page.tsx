@@ -340,7 +340,7 @@ export default function HomePage() {
             <div className="rounded-3xl border border-emerald-500/30 bg-emerald-950/30 p-6">
               <h2 className="text-lg font-semibold">Day-by-day structure</h2>
               <div className="mt-4 bg-black/20 rounded-2xl p-4">
-                <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
+                <StudyPlanViewer plan={plan.plan} />
               </div>
             </div>
 
