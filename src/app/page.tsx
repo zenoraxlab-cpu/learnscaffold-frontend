@@ -88,13 +88,13 @@ export default function HomePage() {
     status === 'uploading' || status === 'analyzing' || status === 'generating';
 
   /* ---------------------------------------------------------
-     TIMER FOR GENERATION
+     TIMER
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (status !== 'generating') return;
-
     setElapsedSeconds(0);
+
     const timer = setInterval(() => {
       setElapsedSeconds((x) => x + 1);
     }, 1000);
@@ -103,7 +103,7 @@ export default function HomePage() {
   }, [status]);
 
   /* ---------------------------------------------------------
-     POLLING BACKEND STATUS
+     POLLING STATUS
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -141,7 +141,7 @@ export default function HomePage() {
   }, [fileId, status]);
 
   /* ---------------------------------------------------------
-     SOFT PROGRESS BAR
+     SMOOTH PROGRESS BAR FILL
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -295,9 +295,7 @@ export default function HomePage() {
             <h2 className="text-lg font-semibold">Learning plan settings</h2>
 
             <div className="mt-3">
-              <p className="text-sm">
-                Document type: {analysis.document_type}
-              </p>
+              <p className="text-sm">Document type: {analysis.document_type}</p>
               <p className="text-sm">Level: {analysis.level}</p>
             </div>
 
@@ -321,6 +319,7 @@ export default function HomePage() {
               </label>
               <LanguageSelector
                 value={planLanguage}
+                original={analysis.language || "en"}
                 onChange={(l) => setPlanLanguage(l)}
               />
             </div>
