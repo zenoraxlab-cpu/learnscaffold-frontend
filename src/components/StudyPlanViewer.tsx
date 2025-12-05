@@ -5,22 +5,19 @@ import React from 'react';
 export interface PlanDay {
   day_number: number;
   title: string;
-  goals: string[];
-  theory: string;
-  practice: string[];
-  summary: string;
+  goals?: string[];
+  theory?: string;
+  practice?: string[];
+  summary?: string;
   quiz?: { q: string; a: string }[];
   source_pages?: number[];
 }
 
 export interface Props {
-  /** Daily plan data */
+  analysis: any;
   plan: {
     days: PlanDay[];
   };
-
-  /** Block copied from backend response */
-  analysis: any;
 }
 
 export default function StudyPlanViewer({ plan, analysis }: Props) {
