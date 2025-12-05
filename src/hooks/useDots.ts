@@ -1,17 +1,20 @@
+'use client';
 import { useState, useEffect } from 'react';
 
-export function useDots() {
+/**
+ * Animated dots for loading indicators ("Analyzing.", "Analyzing..", "Analyzing...")
+ * This hook cycles dots from '' → '.' → '..' → '...' → '' ...
+ */
+export const useDots = () => {
   const [dots, setDots] = useState('');
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setDots((d) =>
-        d.length >= 3 ? '' : d + '.'
-      );
+      setDots((prev) => (prev.length < 3 ? prev + '.' : ''));
     }, 400);
 
     return () => clearInterval(interval);
   }, []);
 
   return dots;
-}
+};
