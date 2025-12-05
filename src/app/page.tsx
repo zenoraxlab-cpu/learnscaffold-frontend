@@ -37,7 +37,6 @@ const STATUS_PROGRESS_MAP: Record<string, number> = {
   chunking: 70,
   classifying: 80,
   structure: 90,
-  building_structure: 90,
   ready: 100,
   error: 100,
 };
@@ -53,7 +52,6 @@ const STATUS_LABELS: Record<string, string> = {
   chunking: 'Splitting data',
   classifying: 'Classifying content',
   structure: 'Extracting structure',
-  building_structure: 'Structuring model',
   ready: 'Analysis complete',
   error: 'Error',
 };
@@ -76,10 +74,10 @@ export default function HomePage() {
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
-  const dots = useDots();
+  const dots = useDots(); // fixed
 
   /* ---------------------------------------------------------
-      POLLING ANALYSIS
+      POLLING ANALYSIS STATUS
   --------------------------------------------------------- */
   useEffect(() => {
     if (!fileId || !status || status === 'ready' || status === 'error') return;
@@ -95,9 +93,7 @@ export default function HomePage() {
 
       if (resp.status === 'ready') {
         clearInterval(timer);
-        if (resp.analysis) {
-          setAnalysis(resp.analysis);
-        }
+        setAnalysis(resp.analysis || null);
       }
     }, 1200);
 
@@ -133,6 +129,7 @@ export default function HomePage() {
 
   /* ---------------------------------------------------------
       GENERATE STUDY PLAN
+      FULL FIXED SIGNATURE: generatePlan(file_id, days, language)
   --------------------------------------------------------- */
   async function handleGenerate() {
     if (!fileId || !analysis) return;
@@ -141,7 +138,9 @@ export default function HomePage() {
     setProgress(0);
 
     try {
-      const resp = await generatePlan(fileId, analysis.recommended_days ?? 10, planLanguage);
+      const days = analysis.recommended_days || 10;
+
+      const resp = await generatePlan(fileId, days, planLanguage);
 
       setPlan(resp);
       setEditableText(resp.full_text ?? '');
@@ -155,13 +154,15 @@ export default function HomePage() {
 
   /* ---------------------------------------------------------
       DOWNLOAD PDF
+      FIXED SIGNATURE: downloadPlanPdf(file_id, text, language)
   --------------------------------------------------------- */
   async function handleDownloadPdf() {
     if (!fileId || !editableText.trim()) return;
 
     setIsDownloading(true);
+
     try {
-      await downloadPlanPdf(fileId, editableText);
+      await downloadPlanPdf(fileId, editableText, planLanguage);
     } catch (err) {
       console.error(err);
       alert('PDF generation failed');
@@ -170,10 +171,11 @@ export default function HomePage() {
     }
   }
 
+  const statusLabel = status ? STATUS_LABELS[status] ?? status : null;
+
   /* ---------------------------------------------------------
       RENDER
   --------------------------------------------------------- */
-  const statusLabel = status ? STATUS_LABELS[status] ?? status : null;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -181,12 +183,12 @@ export default function HomePage() {
         AI Study Plan Generator
       </h1>
 
-      {/* ------------------------------------ Upload Section */}
+      {/* UPLOAD */}
       <section className="mt-8">
         <FileDropzone disabled={isBusy} onFileUpload={handleUpload} />
       </section>
 
-      {/* ------------------------------------ Progress Section */}
+      {/* PROGRESS */}
       {status && status !== 'ready' && status !== 'error' && (
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <p className="text-sm text-white/80">
@@ -196,7 +198,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ------------------------------------ Analysis Result */}
+      {/* ANALYSIS */}
       {status === 'ready' && analysis && (
         <section className="mt-6 rounded-3xl border border-emerald-500/40 bg-emerald-900/20 p-6">
           <h2 className="text-xl font-semibold">Document analysis</h2>
@@ -209,13 +211,11 @@ export default function HomePage() {
             Recommended days: {analysis.recommended_days}
           </p>
 
-          <div className="mt-3">
-            <LanguageSelector
-              value={planLanguage}
-              original={analysis.document_language || 'en'}
-              onChange={setPlanLanguage}
-            />
-          </div>
+          <LanguageSelector
+            value={planLanguage}
+            original={analysis.document_language || 'en'}
+            onChange={setPlanLanguage}
+          />
 
           <button
             onClick={handleGenerate}
@@ -227,19 +227,18 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ------------------------------------ Final Plan Section */}
+      {/* FINAL PLAN */}
       {plan && (
         <section className="mt-8 space-y-6">
-          {/* Viewer */}
+          {/* VIEWER */}
           <div className="rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
             <h2 className="text-lg font-semibold">Day-by-day structure</h2>
-
             <div className="mt-4 rounded-2xl bg-black/20 p-4">
               <StudyPlanViewer plan={{ days: plan.plan?.days || [] }} />
             </div>
           </div>
 
-          {/* Editable text */}
+          {/* TEXT EDITOR */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-base font-semibold">Editable learning plan text</h2>
 
