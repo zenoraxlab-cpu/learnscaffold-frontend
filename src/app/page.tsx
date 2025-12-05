@@ -319,7 +319,7 @@ export default function HomePage() {
               </label>
               <LanguageSelector
                 value={planLanguage}
-                original="auto"}
+                original="auto"
                 onChange={(l) => setPlanLanguage(l)}
               />
             </div>
