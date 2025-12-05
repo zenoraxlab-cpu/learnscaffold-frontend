@@ -431,7 +431,7 @@ interface UploadSectionProps {
 
 function UploadSection({
   status,
-  analysisStatus: _analysisStatus, // пока не используем
+  analysisStatus: _analysisStatus, // не используем сейчас
   analysisProgress,
   error,
   fileId,
@@ -583,7 +583,7 @@ function AnalysisSection({
         <button
           type="button"
           onClick={onGenerate}
-          disabled(!fileId || isBusy)
+          disabled={!fileId || isBusy}
           className={[
             'rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-wide',
             !fileId || isBusy
