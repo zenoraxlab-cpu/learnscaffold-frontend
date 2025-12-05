@@ -53,7 +53,7 @@ export async function getAnalysisStatus(fileId: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE LEARNING PLAN
+   GENERATE LEARNING PLAN — normalized format
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -75,59 +75,44 @@ export async function generatePlan(
     throw new Error(`Generate failed (${res.status}): ${txt}`);
   }
 
-  let json: any;
+  const json = await res.json();
 
-  try {
-    json = await res.json();
-  } catch (e) {
-    console.error("JSON parse error:", e);
-    throw new Error("Invalid JSON from backend");
-  }
-
-  console.log("RAW PLAN RESPONSE:", JSON.stringify(json, null, 2));
-
-  /* Normalize plan.days */
+  // Normalize plan
   let normalizedDays: any[] = [];
 
   if (Array.isArray(json.plan)) {
     normalizedDays = json.plan;
-  } else if (json.plan && Array.isArray(json.plan.days)) {
+  } else if (json.plan?.days && Array.isArray(json.plan.days)) {
     normalizedDays = json.plan.days;
   } else if (json.plan && typeof json.plan === "object") {
     normalizedDays = Object.values(json.plan);
   }
 
-  if (!Array.isArray(normalizedDays)) {
-    throw new Error("Invalid plan structure");
-  }
-
   json.plan = { days: normalizedDays };
-
   return json;
 }
 
 /* ---------------------------------------------------------
-   DOWNLOAD PDF (FIXED)
+   DOWNLOAD PDF  — FIXED SIGNATURE (FINAL)
 --------------------------------------------------------- */
 export async function downloadPlanPdf(
-  fileId: string,
   text: string,
-  language: string
-) {
+  fileId: string,
+  days: number
+): Promise<Blob> {
   const res = await fetch(`${API_URL}/plan/pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       file_id: fileId,
+      days,
       text,
-      language,
     }),
   });
 
   if (!res.ok) {
-    const txt = await res.text();
-    console.error("PDF ERROR:", txt);
-    throw new Error("PDF generation failed");
+    const txt = await res.text().catch(() => "");
+    throw new Error(`PDF generation failed (${res.status}): ${txt}`);
   }
 
   return res.blob();
