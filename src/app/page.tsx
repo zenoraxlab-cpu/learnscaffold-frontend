@@ -18,10 +18,7 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-import type {
-  StudyPlanResponse,
-  AnalysisBlock,
-} from '@/types/studyplan';
+import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -297,7 +294,8 @@ export default function HomePage() {
     try {
       setIsDownloading(true);
 
-      const blob = await downloadPlanPdf(editableText, fileId, days);
+      // ВАЖНО: третий аргумент приводим к строке, чтобы совпасть с типами TS
+      const blob = await downloadPlanPdf(editableText, fileId, String(days));
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
 
@@ -431,7 +429,7 @@ interface UploadSectionProps {
 
 function UploadSection({
   status,
-  analysisStatus: _analysisStatus, // не используем сейчас
+  analysisStatus: _analysisStatus,
   analysisProgress,
   error,
   fileId,
@@ -554,7 +552,7 @@ function AnalysisSection({
 
           {status === 'generating' && (
             <div className="mt-4">
-              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="mb-1 flex items-center justify между текст-[11px] text-slate-400">
                 <span>Generating learning plan{dots}</span>
                 <span>
                   {remainingSeconds > 0
