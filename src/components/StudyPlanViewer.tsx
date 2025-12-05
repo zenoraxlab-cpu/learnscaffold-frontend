@@ -29,7 +29,8 @@ export default function StudyPlanViewer({ plan }: Props) {
             Day {day.day_number}: {day.title}
           </h3>
 
-          {day.goals?.length > 0 && (
+          {/* Goals */}
+          {Array.isArray(day.goals) && day.goals.length > 0 && (
             <div className="mt-2">
               <p className="text-xs uppercase text-white/40">Goals</p>
               <ul className="ml-4 list-disc text-sm text-white/80">
@@ -40,6 +41,7 @@ export default function StudyPlanViewer({ plan }: Props) {
             </div>
           )}
 
+          {/* Theory */}
           {day.theory && (
             <div className="mt-2">
               <p className="text-xs uppercase text-white/40">Theory</p>
@@ -49,7 +51,8 @@ export default function StudyPlanViewer({ plan }: Props) {
             </div>
           )}
 
-          {day.practice?.length > 0 && (
+          {/* Practice */}
+          {Array.isArray(day.practice) && day.practice.length > 0 && (
             <div className="mt-2">
               <p className="text-xs uppercase text-white/40">Practice</p>
               <ul className="ml-4 list-disc text-sm text-white/80">
@@ -60,6 +63,7 @@ export default function StudyPlanViewer({ plan }: Props) {
             </div>
           )}
 
+          {/* Summary */}
           {day.summary && (
             <div className="mt-2">
               <p className="text-xs uppercase text-white/40">Summary</p>
@@ -69,7 +73,8 @@ export default function StudyPlanViewer({ plan }: Props) {
             </div>
           )}
 
-          {day.quiz?.length > 0 && (
+          {/* Quiz */}
+          {Array.isArray(day.quiz) && day.quiz.length > 0 && (
             <div className="mt-2">
               <p className="text-xs uppercase text-white/40">Quiz</p>
               <ul className="ml-4 list-disc text-sm text-white/80">
