@@ -15,11 +15,7 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-
-import type {
-  StudyPlanResponse,
-  AnalysisBlock,
-} from '@/types/studyplan';
+import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -31,221 +27,141 @@ const STATUS_PROGRESS_MAP: Record<string, number> = {
   analyzing: 20,
   extracting: 35,
   extracting_pages: 35,
-  extracting_text: 50,
   text_extracting: 50,
+  extracting_text: 50,
   cleaning: 60,
   chunking: 70,
   classifying: 80,
   structure: 90,
   building_structure: 90,
-  ocr_running: 25,
-  ocr_extracting: 40,
-  ocr_complete: 55,
   ready: 100,
   error: 100,
 };
 
-/* ---------------------------------------------------------
-   HUMAN-READABLE LABELS
---------------------------------------------------------- */
-
 const STATUS_LABELS: Record<string, string> = {
-  uploading: 'Uploading...',
-  uploaded: 'File uploaded',
-  analyzing: 'Analyzing document...',
-  extracting: 'Extracting pages...',
-  extracting_pages: 'Extracting pages...',
-  extracting_text: 'Extracting text...',
-  text_extracting: 'Extracting text...',
-  cleaning: 'Cleaning text...',
-  chunking: 'Splitting into chunks...',
-  classifying: 'Classifying...',
-  structure: 'Extracting structure...',
-  building_structure: 'Extracting structure...',
-  ocr_running: 'Running OCR...',
-  ocr_extracting: 'Running OCR...',
-  ocr_complete: 'OCR completed',
-  ready: 'Analysis completed',
+  uploading: 'Uploading…',
+  uploaded: 'Uploaded',
+  analyzing: 'Analyzing…',
+  extracting: 'Extracting…',
+  extracting_pages: 'Extracting pages…',
+  text_extracting: 'Extracting text…',
+  extracting_text: 'Extracting text…',
+  cleaning: 'Cleaning text…',
+  chunking: 'Chunking…',
+  classifying: 'Classifying…',
+  structure: 'Extracting structure…',
+  building_structure: 'Building structure…',
+  ready: 'Ready for plan generation',
   error: 'Error',
 };
 
 /* ---------------------------------------------------------
-   FINAL PLAN SECTION PROPS
+   MAIN COMPONENT
 --------------------------------------------------------- */
 
-interface FinalPlanSectionProps {
-  plan: StudyPlanResponse;
-  analysis: AnalysisBlock | null;
-  editableText: string;
-  setEditableText: (text: string) => void;
-  isBusy: boolean;
-  isDownloading: boolean;
-  onDownload: () => void;
-  fileId: string | null;
-}
-
-/* ---------------------------------------------------------
-   FINAL PLAN SECTION
---------------------------------------------------------- */
-
-function FinalPlanSection({
-  plan,
-  analysis,
-  editableText,
-  setEditableText,
-  isBusy,
-  isDownloading,
-  onDownload,
-  fileId,
-}: FinalPlanSectionProps) {
-  return (
-    <>
-      <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
-        <p className="text-xs uppercase tracking-wide text-emerald-300/80">
-          Final plan
-        </p>
-
-        <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
-
-        <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          <StudyPlanViewer
-            plan={{ days: plan?.plan?.days || [] }}
-            analysis={analysis}
-          />
-        </div>
-      </section>
-
-      <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-        <h2 className="text-base font-semibold">Editable learning plan text</h2>
-
-        <textarea
-          className="mt-3 h-80 w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm leading-relaxed text-slate-900 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-          value={editableText}
-          onChange={(e) => setEditableText(e.target.value)}
-        />
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onDownload}
-            disabled={
-              !editableText.trim() || !fileId || isBusy || isDownloading
-            }
-            className={[
-              'rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-wide',
-              !editableText.trim() || !fileId || isBusy || isDownloading
-                ? 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500'
-                : 'border-emerald-500 bg-emerald-500 text-slate-950 hover:bg-emerald-400',
-            ].join(' ')}
-          >
-            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
-          </button>
-
-          <p className="text-[11px] text-slate-500">
-            PDF is generated from this text (including your edits)
-          </p>
-        </div>
-      </section>
-    </>
-  );
-}
-
-/* ---------------------------------------------------------
-   MAIN PAGE
---------------------------------------------------------- */
-
-export default function HomePage() {
+export default function Page() {
   const dots = useDots();
 
+  const [file, setFile] = useState<File | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+
   const [analysis, setAnalysis] = useState<AnalysisBlock | null>(null);
   const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
-  const [days, setDays] = useState<number>(10);
-  const [planLanguage, setPlanLanguage] = useState<string>('en');
 
-  const [editableText, setEditableText] = useState('');
+  const [progress, setProgress] = useState<number>(0);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const [planLanguage, setPlanLanguage] = useState<string>('en');
+  const [editableText, setEditableText] = useState<string>('');
   const [isBusy, setIsBusy] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const progress = status ? STATUS_PROGRESS_MAP[status] || 0 : 0;
-  const statusLabel = status ? STATUS_LABELS[status] || status : '';
-
   /* ---------------------------------------------------------
-     POLLING
+     POLLING STATUS
   --------------------------------------------------------- */
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+  function startPolling(id: string) {
+    let timer: ReturnType<typeof setInterval> | null = null;
 
-    if (
-      status === 'analyzing' ||
-      status === 'extracting' ||
-      status === 'ocr_running'
-    ) {
-      timer = setInterval(async () => {
-        if (!fileId) return;
-        const s = await getAnalysisStatus(fileId);
-        if (s?.status) {
-          setStatus(s.status);
-          if (s.status === 'ready') clearInterval(timer!);
+    timer = setInterval(async () => {
+      try {
+        const res = await getAnalysisStatus(id);
+        if (!res?.status) return;
+
+        const backendStatus = res.status.toLowerCase();
+        setStatus(backendStatus);
+
+        const mapped = STATUS_PROGRESS_MAP[backendStatus];
+        if (mapped !== undefined) setProgress(mapped);
+
+        if (backendStatus === 'error' || backendStatus === 'ready') {
+          clearInterval(timer!);
+          timer = null;
+
+          if (backendStatus === 'error') {
+            setIsBusy(false);
+          }
+
+          if (backendStatus === 'ready') {
+            const result = await analyze(id);
+            setAnalysis(result);
+            setIsBusy(false);
+          }
         }
-      }, 1500);
+      } catch (_) {}
+    }, 1200);
+  }
+
+  /* ---------------------------------------------------------
+     FILE UPLOAD
+  --------------------------------------------------------- */
+
+  async function handleUpload() {
+    if (!file) return;
+
+    setIsBusy(true);
+    setStatus('uploading');
+    setProgress(5);
+
+    const res = await uploadStudyFile(file);
+
+    if (!res?.file_id) {
+      setStatus('error');
+      setIsBusy(false);
+      return;
     }
 
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [status, fileId]);
-
-  /* ---------------------------------------------------------
-     UPLOAD
-  --------------------------------------------------------- */
-
-  async function handleUpload(file: File) {
-    setStatus('uploading');
-    const res = await uploadStudyFile(file);
     setFileId(res.file_id);
     setStatus('uploaded');
-    setAnalysis(null);
-    setPlan(null);
-    setEditableText('');
+    setProgress(10);
+    startPolling(res.file_id);
   }
 
   /* ---------------------------------------------------------
-     ANALYZE
+     GENERATE LEARNING PLAN
   --------------------------------------------------------- */
 
-  async function handleAnalyze() {
-    if (!fileId) return;
+  async function handleGenerate() {
+    if (!fileId || !analysis) return;
+
     setIsBusy(true);
-    setStatus('analyzing');
+    setStatus('generating');
+    setProgress(0);
 
-    const res = await analyze(fileId);
+    const resp = await generatePlan({
+      file_id: fileId,
+      days: analysis.recommended_days || 10,
+      language: planLanguage,
+    });
 
-    setAnalysis(res.analysis || null);
-    setDays(res.analysis?.recommended_days || 10);
-
-    if (res.analysis?.document_language) {
-      setPlanLanguage(res.analysis.document_language === 'en' ? 'en' : 'en');
+    if (!resp || !resp.plan) {
+      setStatus('error');
+      setIsBusy(false);
+      return;
     }
 
-    setIsBusy(false);
-  }
-
-  /* ---------------------------------------------------------
-     GENERATE PLAN
-  --------------------------------------------------------- */
-
-  async function handleGeneratePlan() {
-    if (!fileId) return;
-    setIsBusy(true);
-
-    const result = await generatePlan(fileId, days, planLanguage);
-
-    setPlan(result);
-    setEditableText(result?.text || '');
-
+    setPlan(resp);
+    setEditableText(resp.plan_text || '');
     setIsBusy(false);
   }
 
@@ -253,96 +169,116 @@ export default function HomePage() {
      DOWNLOAD PDF
   --------------------------------------------------------- */
 
-  async function handleDownloadPdf() {
+  async function handleDownload() {
     if (!fileId || !editableText.trim()) return;
 
     setIsDownloading(true);
-    const pdf = await downloadPlanPdf(editableText, fileId, days);
-
-    const url = URL.createObjectURL(pdf);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'study_plan.pdf';
-    a.click();
-
-    setIsDownloading(false);
+    try {
+      await downloadPlanPdf(fileId, editableText);
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   /* ---------------------------------------------------------
-     UI
+     RENDER
   --------------------------------------------------------- */
 
   return (
-    <main className="mx-auto max-w-3xl px-6 pb-32 pt-10">
-      <h1 className="text-3xl font-bold">LearnScaffold</h1>
+    <main className="mx-auto max-w-2xl px-6 py-10 text-white">
+      <h1 className="text-center text-3xl font-bold">LearnScaffold</h1>
+      <p className="mt-2 text-center text-sm text-white/70">
+        AI-powered study plan generator
+      </p>
 
-      <section className="mt-6">
-        <FileDropzone onFileSelected={handleUpload} />
+      {/* Upload Section */}
+      <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
+        <FileDropzone file={file} setFile={setFile} />
+        <button
+          className="mt-4 w-full rounded-xl bg-emerald-500 py-3 font-semibold text-black"
+          onClick={handleUpload}
+          disabled={!file || isBusy}
+        >
+          {isBusy && status !== 'ready' ? 'Processing…' : 'Upload'}
+        </button>
       </section>
 
-      {status && status !== 'ready' && status !== 'error' && (
+      {/* Progress Section */}
+      {status && status !== 'ready' && (
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <p className="text-sm text-white/80">{statusLabel} {dots}</p>
+          <p className="text-sm text-white/80">
+            {STATUS_LABELS[status] || status} {dots}
+          </p>
           <ProgressBar progress={progress} />
         </section>
       )}
 
+      {/* Analysis Section */}
       {analysis && (
-        <section className="mt-6 rounded-3xl border border-blue-500/30 bg-blue-950/30 p-6">
-          <h2 className="text-lg font-semibold">Document analysis</h2>
-
-          <p className="mt-3 text-sm text-white/80">
-            <strong>Document type:</strong> {analysis.document_type}
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+          <p className="text-xs uppercase tracking-wide text-emerald-300/80">
+            Document analysis
           </p>
 
-          <p className="mt-2 text-sm text-white/80">
-            <strong>Main topics:</strong>{' '}
-            {analysis.main_topics?.join(', ') || '—'}
-          </p>
+          <h2 className="mt-1 text-lg font-semibold">{analysis.document_type}</h2>
 
-          <p className="mt-2 text-sm text-white/80">
-            <strong>Recommended days:</strong>{' '}
-            {analysis.recommended_days || 10}
+          <p className="mt-3 text-sm text-white/70">
+            {analysis.short_description}
           </p>
 
           <div className="mt-4">
+            <p className="text-sm">Original language: {analysis.document_language}</p>
+
             <LanguageSelector
               value={planLanguage}
-              original={analysis.document_language || 'en'}
-              onChange={setPlanLanguage}
+              original={analysis.document_language}
+              onChange={(lang) => setPlanLanguage(lang)}
             />
+
+            <button
+              className="mt-4 w-full rounded-xl bg-emerald-500 py-3 font-semibold text-black"
+              disabled={isBusy}
+              onClick={handleGenerate}
+            >
+              Generate Study Plan
+            </button>
           </div>
-
-          <button
-            onClick={handleAnalyze}
-            disabled={isBusy}
-            className="mt-4 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-          >
-            Continue analysis
-          </button>
-
-          <button
-            type="button"
-            onClick={handleGeneratePlan}
-            disabled={isBusy}
-            className="mt-4 ml-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-          >
-            Generate learning plan
-          </button>
         </section>
       )}
 
+      {/* Final Plan */}
       {plan && (
-        <FinalPlanSection
-          plan={plan}
-          analysis={analysis}
-          editableText={editableText}
-          setEditableText={setEditableText}
-          isBusy={isBusy}
-          isDownloading={isDownloading}
-          onDownload={handleDownloadPdf}
-          fileId={fileId}
-        />
+        <>
+          <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
+            <p className="text-xs uppercase tracking-wide text-emerald-300/80">
+              Final plan
+            </p>
+
+            <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
+
+            <div className="mt-4 rounded-2xl bg-black/20 p-4">
+              <StudyPlanViewer plan={{ days: plan.plan?.days || [] }} />
+            </div>
+          </section>
+
+          <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
+            <h2 className="text-base font-semibold">Editable learning plan text</h2>
+
+            <textarea
+              className="mt-3 h-80 w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm text-slate-900"
+              value={editableText}
+              onChange={(e) => setEditableText(e.target.value)}
+            />
+
+            <button
+              className="mt-4 w-full rounded-xl bg-emerald-500 py-3 font-semibold text-black"
+              disabled={!editableText.trim() || isDownloading}
+              onClick={handleDownload}
+            >
+              {isDownloading ? 'Generating PDF…' : 'Download PDF'}
+            </button>
+          </section>
+        </>
       )}
     </main>
   );
