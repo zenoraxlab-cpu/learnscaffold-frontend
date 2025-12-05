@@ -92,9 +92,7 @@ export default function HomePage() {
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
   const isBusy =
-    status === 'uploading' ||
-    status === 'analyzing' ||
-    status === 'generating';
+    status === 'uploading' || status === 'analyzing' || status === 'generating';
 
   /* ---------------------------------------------------------
      GENERATION TIMER (FIXED CLEANUP)
@@ -137,7 +135,7 @@ export default function HomePage() {
       if (cancelled) return;
 
       try {
-        const st = await getAnalysisStatus(fileId);
+        const st = await getAnalysisStatus(fileId, planLanguage);
 
         if (st?.status) {
           setAnalysisStatus(st.status);
@@ -232,7 +230,7 @@ export default function HomePage() {
 
         setStatus('analyzing');
 
-        const res = await analyze(uploadRes.file_id);
+        const res = await analyze(uploadRes.file_id, planLanguage);
 
         if (!res?.analysis || !res.analysis.document_type) {
           throw new Error('Malformed analysis data');
@@ -453,7 +451,9 @@ function UploadSection({
       </p>
 
       <div className="mt-6">
-        <FileDropzone onFileSelected={isBusy ? undefined : handleFileSelected} />
+        <FileDropzone
+          onFileSelected={isBusy ? undefined : handleFileSelected}
+        />
       </div>
 
       {(status === 'uploading' || status === 'analyzing') && (
@@ -513,7 +513,9 @@ function AnalysisSection({
 
       <div className="mt-3 grid gap-4 text-sm text-slate-100 md:grid-cols-2">
         <div>
-          <LabelBlock title="Document type">{analysis.document_type}</LabelBlock>
+          <LabelBlock title="Document type">
+            {analysis.document_type}
+          </LabelBlock>
           <LabelBlock title="Level">{analysis.level}</LabelBlock>
 
           {analysis.main_topics?.length > 0 && (
@@ -595,7 +597,9 @@ function AnalysisSection({
               : 'border border-emerald-400 bg-emerald-500 text-slate-950 hover:bg-emerald-400',
           ].join(' ')}
         >
-          {status === 'generating' ? `Generating${dots}` : 'Generate learning plan'}
+          {status === 'generating'
+            ? `Generating${dots}`
+            : 'Generate learning plan'}
         </button>
       </div>
     </section>
@@ -710,7 +714,9 @@ function StepBadge({ active, number, label }: StepBadgeProps) {
       >
         {number}
       </div>
-      <span className={active ? 'text-xs text-slate-100' : 'text-xs text-slate-500'}>
+      <span
+        className={active ? 'text-xs text-slate-100' : 'text-xs text-slate-500'}
+      >
         {label}
       </span>
     </div>
@@ -754,7 +760,7 @@ function planToText(plan: StudyPlanResponse): string {
   lines.push('');
 
   lines.push(
-    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`
+    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`,
   );
 
   if (plan.analysis.main_topics?.length) {
