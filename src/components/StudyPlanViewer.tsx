@@ -1,123 +1,90 @@
-'use client';
+"use client";
 
-import React from 'react';
-import type { AnalysisBlock, PlanBlock, PlanDay } from '@/types/studyplan';
+import React from "react";
+import type { PlanDay } from "@/types/studyplan";
 
 interface Props {
-  analysis: AnalysisBlock | null | undefined;
-  plan: PlanBlock | null | undefined;
+  plan: {
+    days: PlanDay[];
+  };
 }
 
-export default function StudyPlanViewer({ analysis, plan }: Props) {
-  // SAFETY CHECKS — never crash
-  if (!analysis) {
-    return (
-      <div className="text-sm text-slate-400">
-        No analysis data available.
-      </div>
-    );
-  }
-
+export default function StudyPlanViewer({ plan }: Props) {
   if (!plan || !Array.isArray(plan.days)) {
     return (
-      <div className="text-sm text-slate-400">
-        No valid plan data available.
+      <div className="text-sm text-red-300">
+        Invalid plan structure
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Document meta */}
-      <div className="rounded-xl bg-slate-800/40 p-4 text-sm">
-        <p>
-          <span className="text-sky-300">Document type:</span>{' '}
-          {analysis.document_type || 'unknown'}
-        </p>
+    <div className="space-y-4">
+      {plan.days.map((day, idx) => (
+        <div
+          key={idx}
+          className="rounded-xl border border-white/10 bg-white/5 p-4"
+        >
+          <h3 className="font-semibold text-emerald-300">
+            Day {day.day_number}: {day.title}
+          </h3>
 
-        <p>
-          <span className="text-sky-300">Level:</span>{' '}
-          {analysis.level || 'unknown'}
-        </p>
+          {day.goals?.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs uppercase text-white/40">Goals</p>
+              <ul className="ml-4 list-disc text-sm text-white/80">
+                {day.goals.map((g, i) => (
+                  <li key={i}>{g}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        {Array.isArray(analysis.main_topics) && (
-          <p>
-            <span className="text-sky-300">Main topics:</span>{' '}
-            {analysis.main_topics.join(', ')}
-          </p>
-        )}
-      </div>
-
-      {/* Days list */}
-      <div className="space-y-4">
-        {plan.days.map((day: PlanDay) => (
-          <div
-            key={day.day_number}
-            className="rounded-xl border border-slate-700 bg-slate-900/50 p-4"
-          >
-            <h3 className="text-base font-semibold text-emerald-300">
-              Day {day.day_number}: {day.title}
-            </h3>
-
-            {day.source_pages && day.source_pages.length > 0 && (
-              <p className="text-xs text-slate-400 mt-1">
-                Pages: {day.source_pages.join(', ')}
+          {day.theory && (
+            <div className="mt-2">
+              <p className="text-xs uppercase text-white/40">Theory</p>
+              <p className="text-sm text-white/80 whitespace-pre-line">
+                {day.theory}
               </p>
-            )}
+            </div>
+          )}
 
-            {day.goals && day.goals.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs uppercase text-sky-300">Goals</p>
-                <ul className="list-disc pl-5 text-sm">
-                  {day.goals.map((g, idx) => (
-                    <li key={idx}>{g}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          {day.practice?.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs uppercase text-white/40">Practice</p>
+              <ul className="ml-4 list-disc text-sm text-white/80">
+                {day.practice.map((p, i) => (
+                  <li key={i}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-            {day.theory && (
-              <div className="mt-3">
-                <p className="text-xs uppercase text-sky-300">Theory</p>
-                <p className="text-sm whitespace-pre-line">{day.theory}</p>
-              </div>
-            )}
+          {day.summary && (
+            <div className="mt-2">
+              <p className="text-xs uppercase text-white/40">Summary</p>
+              <p className="text-sm text-white/80 whitespace-pre-line">
+                {day.summary}
+              </p>
+            </div>
+          )}
 
-            {day.practice && day.practice.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs uppercase text-sky-300">Practice</p>
-                <ul className="list-disc pl-5 text-sm">
-                  {day.practice.map((task, idx) => (
-                    <li key={idx}>{task}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {day.summary && (
-              <div className="mt-3">
-                <p className="text-xs uppercase text-sky-300">Daily summary</p>
-                <p className="text-sm whitespace-pre-line">{day.summary}</p>
-              </div>
-            )}
-
-            {day.quiz && day.quiz.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs uppercase text-sky-300">Review questions</p>
-                <ul className="list-disc pl-5 text-sm">
-                  {day.quiz.map((q, idx) => (
-                    <li key={idx}>
-                      <strong>Q:</strong> {q.q}
-                      <br />
-                      <strong>A:</strong> {q.a}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+          {day.quiz?.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs uppercase text-white/40">Quiz</p>
+              <ul className="ml-4 list-disc text-sm text-white/80">
+                {day.quiz.map((q, i) => (
+                  <li key={i}>
+                    <strong>{q.q}</strong>
+                    <br />
+                    {q.a}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
