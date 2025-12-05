@@ -591,6 +591,7 @@ interface FinalPlanSectionProps {
 
 function FinalPlanSection({
   plan,
+  analysis,
   editableText,
   setEditableText,
   isBusy,
@@ -600,6 +601,7 @@ function FinalPlanSection({
 }: FinalPlanSectionProps) {
   return (
     <>
+      {/* FINAL PLAN SECTION */}
       <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
         <p className="text-xs uppercase tracking-wide text-emerald-300/80">
           Final plan
@@ -608,10 +610,14 @@ function FinalPlanSection({
         <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
 
         <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          <StudyPlanViewer plan={{ days: plan.plan?.days || [] }} />
+          <StudyPlanViewer
+            plan={{ days: plan?.plan?.days || [] }}
+            analysis={analysis}
+          />
         </div>
       </section>
 
+      {/* EDITABLE TEXT SECTION */}
       <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
         <h2 className="text-base font-semibold">Editable learning plan text</h2>
 
@@ -646,7 +652,6 @@ function FinalPlanSection({
     </>
   );
 }
-
 /* ---------------------------------------------------------
    COMMON UI BLOCKS
 --------------------------------------------------------- */
