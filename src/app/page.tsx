@@ -19,8 +19,6 @@ import ProgressBar from '@/components/ProgressBar';
 import type {
   StudyPlanResponse,
   AnalysisBlock,
-  PlanDay,
-  PlanBlock,
 } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
@@ -33,8 +31,8 @@ const STATUS_PROGRESS_MAP: Record<string, number> = {
   analyzing: 20,
   extracting: 35,
   extracting_pages: 35,
-  text_extracting: 50,
   extracting_text: 50,
+  text_extracting: 50,
   cleaning: 60,
   chunking: 70,
   classifying: 80,
@@ -61,7 +59,7 @@ const STATUS_LABELS: Record<string, string> = {
   text_extracting: 'Extracting text...',
   cleaning: 'Cleaning text...',
   chunking: 'Splitting into chunks...',
-  classifying: 'Identifying document type...',
+  classifying: 'Classifying...',
   structure: 'Extracting structure...',
   building_structure: 'Extracting structure...',
   ocr_running: 'Running OCR...',
@@ -87,7 +85,7 @@ interface FinalPlanSectionProps {
 }
 
 /* ---------------------------------------------------------
-   FINAL PLAN SECTION COMPONENT
+   FINAL PLAN SECTION
 --------------------------------------------------------- */
 
 function FinalPlanSection({
@@ -153,19 +151,16 @@ function FinalPlanSection({
 }
 
 /* ---------------------------------------------------------
-   MAIN PAGE COMPONENT
+   MAIN PAGE
 --------------------------------------------------------- */
 
 export default function HomePage() {
   const dots = useDots();
 
-  const [file, setFile] = useState<File | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
-
   const [status, setStatus] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisBlock | null>(null);
   const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
-
   const [days, setDays] = useState<number>(10);
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
@@ -177,21 +172,23 @@ export default function HomePage() {
   const statusLabel = status ? STATUS_LABELS[status] || status : '';
 
   /* ---------------------------------------------------------
-     POLLING STATUS WHEN ANALYSIS IS RUNNING
+     POLLING
   --------------------------------------------------------- */
 
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer: NodeJS.Timeout | null = null;
 
-    if (status === 'analyzing' || status === 'extracting' || status === 'ocr_running') {
+    if (
+      status === 'analyzing' ||
+      status === 'extracting' ||
+      status === 'ocr_running'
+    ) {
       timer = setInterval(async () => {
         if (!fileId) return;
         const s = await getAnalysisStatus(fileId);
         if (s?.status) {
           setStatus(s.status);
-          if (s.status === 'ready') {
-            clearInterval(timer!);
-          }
+          if (s.status === 'ready') clearInterval(timer!);
         }
       }, 1500);
     }
@@ -202,24 +199,21 @@ export default function HomePage() {
   }, [status, fileId]);
 
   /* ---------------------------------------------------------
-     STEP 1 — FILE UPLOAD
+     UPLOAD
   --------------------------------------------------------- */
 
-  async function handleUpload(f: File) {
-    setPlan(null);
-    setAnalysis(null);
-    setEditableText('');
-    setFile(f);
-
+  async function handleUpload(file: File) {
     setStatus('uploading');
-
-    const res = await uploadStudyFile(f);
+    const res = await uploadStudyFile(file);
     setFileId(res.file_id);
     setStatus('uploaded');
+    setAnalysis(null);
+    setPlan(null);
+    setEditableText('');
   }
 
   /* ---------------------------------------------------------
-     STEP 2 — ANALYZE DOCUMENT
+     ANALYZE
   --------------------------------------------------------- */
 
   async function handleAnalyze() {
@@ -233,14 +227,14 @@ export default function HomePage() {
     setDays(res.analysis?.recommended_days || 10);
 
     if (res.analysis?.document_language) {
-      setPlanLanguage(res.analysis.document_language === 'ru' ? 'en' : 'en');
+      setPlanLanguage(res.analysis.document_language === 'en' ? 'en' : 'en');
     }
 
     setIsBusy(false);
   }
 
   /* ---------------------------------------------------------
-     STEP 3 — GENERATE LEARNING PLAN
+     GENERATE PLAN
   --------------------------------------------------------- */
 
   async function handleGeneratePlan() {
@@ -251,11 +245,12 @@ export default function HomePage() {
 
     setPlan(result);
     setEditableText(result?.text || '');
+
     setIsBusy(false);
   }
 
   /* ---------------------------------------------------------
-     STEP 4 — DOWNLOAD PDF
+     DOWNLOAD PDF
   --------------------------------------------------------- */
 
   async function handleDownloadPdf() {
@@ -264,9 +259,9 @@ export default function HomePage() {
     setIsDownloading(true);
     const pdf = await downloadPlanPdf(editableText, fileId, days);
 
-    const blobUrl = URL.createObjectURL(pdf);
+    const url = URL.createObjectURL(pdf);
     const a = document.createElement('a');
-    a.href = blobUrl;
+    a.href = url;
     a.download = 'study_plan.pdf';
     a.click();
 
@@ -281,20 +276,17 @@ export default function HomePage() {
     <main className="mx-auto max-w-3xl px-6 pb-32 pt-10">
       <h1 className="text-3xl font-bold">LearnScaffold</h1>
 
-      {/* FILE UPLOAD */}
       <section className="mt-6">
         <FileDropzone onFileSelected={handleUpload} />
       </section>
 
-      {/* STATUS */}
       {status && status !== 'ready' && status !== 'error' && (
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <p className="text-sm text-white/80">{statusLabel} {dots}</p>
-          <ProgressBar value={progress} />
+          <ProgressBar progress={progress} />
         </section>
       )}
 
-      {/* ANALYSIS */}
       {analysis && (
         <section className="mt-6 rounded-3xl border border-blue-500/30 bg-blue-950/30 p-6">
           <h2 className="text-lg font-semibold">Document analysis</h2>
@@ -313,7 +305,6 @@ export default function HomePage() {
             {analysis.recommended_days || 10}
           </p>
 
-          {/* Language selector */}
           <div className="mt-4">
             <LanguageSelector
               value={planLanguage}
@@ -323,17 +314,24 @@ export default function HomePage() {
           </div>
 
           <button
+            onClick={handleAnalyze}
+            disabled={isBusy}
+            className="mt-4 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+          >
+            Continue analysis
+          </button>
+
+          <button
             type="button"
             onClick={handleGeneratePlan}
             disabled={isBusy}
-            className="mt-4 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+            className="mt-4 ml-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
           >
             Generate learning plan
           </button>
         </section>
       )}
 
-      {/* FINAL PLAN VIEW */}
       {plan && (
         <FinalPlanSection
           plan={plan}
