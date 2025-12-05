@@ -230,7 +230,7 @@ export default function HomePage() {
 
         setStatus('analyzing');
 
-        const res = await analyze(uploadRes.file_id, planLanguage);
+        const res = await analyze(uploadRes.file_id);
 
         if (!res?.analysis || !res.analysis.document_type) {
           throw new Error('Malformed analysis data');
