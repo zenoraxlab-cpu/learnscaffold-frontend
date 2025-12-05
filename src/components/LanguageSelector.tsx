@@ -1,6 +1,6 @@
 interface Props {
   value: string;
-  original: string;
+  original?: string;
   onChange: (val: string) => void;
 }
 
@@ -12,10 +12,8 @@ export default function LanguageSelector({ value, original, onChange }: Props) {
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="en">English (default)</option>
-      {original !== "en" && (
-        <option value={original}>
-          Original: {original.toUpperCase()}
-        </option>
+      {original !== 'en' && (
+        <option value={original}>Original: {original.toUpperCase()}</option>
       )}
     </select>
   );
