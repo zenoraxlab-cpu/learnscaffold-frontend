@@ -62,7 +62,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function HomePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
   const [status, setStatus] = useState<
     'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error'
   >('idle');
@@ -84,8 +83,6 @@ export default function HomePage() {
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
-  const [ocrPages, setOcrPages] = useState<{current: number; total: number} | null>(null);
-
   const isBusy =
     status === 'uploading' ||
     status === 'analyzing' ||
@@ -100,26 +97,28 @@ export default function HomePage() {
 
     if (status === 'generating') {
       setElapsedSeconds(0);
-      timer = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
+      timer = setInterval(() => setElapsedSeconds((prev) => prev + 1), 1000);
     } else {
       setElapsedSeconds(0);
     }
 
-    return () => {
-      if (timer) clearInterval(timer);
-    };
+    return () => timer && clearInterval(timer);
   }, [status]);
 
   /* ---------------------------------------------------------
-     BACKEND POLLING WITH OCR SUPPORT
+     POLLING BACKEND STATUS
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (!fileId || status !== 'analyzing') return;
 
-    const pollInterval = 2000;
+    const pollInterval =
+      analysisStatus === 'extracting' ||
+      analysisStatus === 'extracting_text' ||
+      analysisStatus === 'classifying'
+        ? 3000
+        : 2000;
+
     let cancelled = false;
 
     const interval = setInterval(async () => {
@@ -131,22 +130,10 @@ export default function HomePage() {
         if (st?.status) {
           setAnalysisStatus(st.status);
 
-          // ---------------- NEW: OCR EXACT PROGRESS ----------------
-          if (st.details?.page_current && st.details?.page_total) {
-            const curr = st.details.page_current;
-            const total = st.details.page_total;
-
-            setOcrPages({ current: curr, total });
-
-            const percent = Math.round((curr / total) * 100);
-            setAnalysisProgress(percent);
-          } else {
-            // fallback — soft progress
-            if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
-              setAnalysisProgress(prev =>
-                Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
-              );
-            }
+          if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
+            setAnalysisProgress((prev) =>
+              Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
+            );
           }
         }
 
@@ -168,10 +155,37 @@ export default function HomePage() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [fileId, status]);
+  }, [fileId, status, analysisStatus]);
 
   /* ---------------------------------------------------------
-     FILE UPLOAD & ANALYSIS
+     SOFT PROGRESS BAR
+  --------------------------------------------------------- */
+
+  useEffect(() => {
+    if (status !== 'analyzing') return;
+
+    setAnalysisProgress((prev) => (prev < 5 ? 5 : prev));
+
+    const timer = setInterval(() => {
+      setAnalysisProgress((prev) => {
+        const key = analysisStatus;
+        const target =
+          key && STATUS_PROGRESS_MAP[key] !== undefined
+            ? STATUS_PROGRESS_MAP[key]
+            : prev;
+
+        if (target > prev) return target;
+        if (!key || target < 85) return Math.min(prev + 2, 85);
+
+        return prev;
+      });
+    }, 700);
+
+    return () => clearInterval(timer);
+  }, [status, analysisStatus]);
+
+  /* ---------------------------------------------------------
+     FILE UPLOAD
   --------------------------------------------------------- */
 
   const handleFileSelected = (file: File) => {
@@ -186,7 +200,6 @@ export default function HomePage() {
     setDays(7);
     setAnalysisStatus(null);
     setAnalysisProgress(0);
-    setOcrPages(null);
     setPlanLanguage('en');
     setStatus('idle');
 
@@ -249,7 +262,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     DOWNLOAD PDF
+     PDF DOWNLOAD
   --------------------------------------------------------- */
 
   const handleDownloadPdf = async () => {
@@ -277,25 +290,14 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     UI LABEL WITH OCR SUPPORT
+     UI STATE
   --------------------------------------------------------- */
 
   const dots = useDots();
-
   const statusKey = analysisStatus || status || 'idle';
   const baseLabel = STATUS_LABELS[statusKey] || statusKey;
-
-  let uiLabel =
-    !['ready', 'error', 'idle'].includes(statusKey) ? `${baseLabel}${dots}` : baseLabel;
-
-  // NEW: if OCR is running → override label
-  if (
-    analysisStatus === 'extracting_text' &&
-    ocrPages?.current &&
-    ocrPages?.total
-  ) {
-    uiLabel = `Extracting text (${ocrPages.current}/${ocrPages.total})`;
-  }
+  const showDots = !['ready', 'error', 'idle'].includes(statusKey);
+  const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -304,7 +306,7 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">v0.8.1</div>
+          <div className="text-xs text-slate-400">Test interface · v0.8.1</div>
         </header>
 
         <Stepper selectedFile={selectedFile} analysis={analysis} plan={plan} />
@@ -318,7 +320,6 @@ export default function HomePage() {
           isBusy={isBusy}
           handleFileSelected={handleFileSelected}
           uiLabel={uiLabel}
-          ocrPages={ocrPages}
         />
 
         {analysis && (
@@ -347,6 +348,7 @@ export default function HomePage() {
         {plan && (
           <FinalPlanSection
             plan={plan}
+            analysis={analysis}
             editableText={editableText}
             setEditableText={setEditableText}
             isBusy={isBusy}
@@ -365,7 +367,7 @@ export default function HomePage() {
 }
 
 /* ---------------------------------------------------------
-   COMPONENTS
+   TYPES
 --------------------------------------------------------- */
 
 interface StepperProps {
@@ -373,6 +375,47 @@ interface StepperProps {
   analysis: AnalysisBlock | null;
   plan: StudyPlanResponse | null;
 }
+
+interface UploadSectionProps {
+  status: string;
+  analysisStatus: string | null;
+  analysisProgress: number;
+  error: string | null;
+  fileId: string | null;
+  isBusy: boolean;
+  handleFileSelected: (file: File) => void;
+  uiLabel: string;
+}
+
+interface AnalysisSectionProps {
+  analysis: AnalysisBlock;
+  recommendedDays: number | null;
+  setDays: (value: number) => void;
+  days: number;
+  planLanguage: string;
+  setPlanLanguage: (lang: string) => void;
+  status: string;
+  fileId: string | null;
+  isBusy: boolean;
+  onGenerate: () => void;
+  generationProgress: number;
+  remainingSeconds: number;
+}
+
+interface FinalPlanSectionProps {
+  plan: StudyPlanResponse;
+  analysis: AnalysisBlock | null;
+  editableText: string;
+  setEditableText: (text: string) => void;
+  isBusy: boolean;
+  isDownloading: boolean;
+  onDownload: () => void;
+  fileId: string | null;
+}
+
+/* ---------------------------------------------------------
+   COMPONENTS
+--------------------------------------------------------- */
 
 function Stepper({ selectedFile, analysis, plan }: StepperProps) {
   return (
@@ -386,18 +429,6 @@ function Stepper({ selectedFile, analysis, plan }: StepperProps) {
   );
 }
 
-interface UploadSectionProps {
-  status: string;
-  analysisStatus: string | null;
-  analysisProgress: number;
-  error: string | null;
-  fileId: string | null;
-  isBusy: boolean;
-  handleFileSelected: (file: File) => void;
-  uiLabel: string;
-  ocrPages: { current: number; total: number } | null;
-}
-
 function UploadSection({
   status,
   analysisStatus,
@@ -407,7 +438,6 @@ function UploadSection({
   isBusy,
   handleFileSelected,
   uiLabel,
-  ocrPages,
 }: UploadSectionProps) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
@@ -424,17 +454,7 @@ function UploadSection({
 
       {(status === 'uploading' || status === 'analyzing') && (
         <div className="mt-4">
-          <ProgressBar
-            progress={analysisProgress}
-            status={uiLabel}
-          />
-
-          {/* NEW: OCR text below bar */}
-          {ocrPages && analysisStatus === 'extracting_text' && (
-            <p className="mt-1 text-xs text-slate-400">
-              {ocrPages.current}/{ocrPages.total} pages processed
-            </p>
-          )}
+          <ProgressBar progress={analysisProgress} status={uiLabel} />
         </div>
       )}
 
@@ -447,21 +467,6 @@ function UploadSection({
       )}
     </section>
   );
-}
-
-interface AnalysisSectionProps {
-  analysis: AnalysisBlock;
-  recommendedDays: number | null;
-  setDays: (value: number) => void;
-  days: number;
-  planLanguage: string;
-  setPlanLanguage: (lang: string) => void;
-  status: string;
-  fileId: string | null;
-  isBusy: boolean;
-  onGenerate: () => void;
-  generationProgress: number;
-  remainingSeconds: number;
 }
 
 function AnalysisSection({
@@ -579,16 +584,6 @@ function AnalysisSection({
   );
 }
 
-interface FinalPlanSectionProps {
-  plan: StudyPlanResponse;
-  editableText: string;
-  setEditableText: (text: string) => void;
-  isBusy: boolean;
-  isDownloading: boolean;
-  onDownload: () => void;
-  fileId: string | null;
-}
-
 function FinalPlanSection({
   plan,
   analysis,
@@ -601,7 +596,6 @@ function FinalPlanSection({
 }: FinalPlanSectionProps) {
   return (
     <>
-      {/* FINAL PLAN SECTION */}
       <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
         <p className="text-xs uppercase tracking-wide text-emerald-300/80">
           Final plan
@@ -617,7 +611,6 @@ function FinalPlanSection({
         </div>
       </section>
 
-      {/* EDITABLE TEXT SECTION */}
       <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
         <h2 className="text-base font-semibold">Editable learning plan text</h2>
 
@@ -652,17 +645,20 @@ function FinalPlanSection({
     </>
   );
 }
+
 /* ---------------------------------------------------------
    COMMON UI BLOCKS
 --------------------------------------------------------- */
 
-interface LabelBlockProps {
+function LabelBlock({
+  title,
+  children,
+  className = '',
+}: {
   title: string;
   children?: React.ReactNode;
   className?: string;
-}
-
-function LabelBlock({ title, children, className = '' }: LabelBlockProps) {
+}) {
   return (
     <div className={className}>
       <div className="text-[11px] uppercase tracking-wide text-sky-300/80">
@@ -673,13 +669,15 @@ function LabelBlock({ title, children, className = '' }: LabelBlockProps) {
   );
 }
 
-interface StepBadgeProps {
+function StepBadge({
+  active,
+  number,
+  label,
+}: {
   active: boolean;
   number: number;
   label: string;
-}
-
-function StepBadge({ active, number, label }: StepBadgeProps) {
+}) {
   return (
     <div className="flex items-center gap-2">
       <div
@@ -699,11 +697,7 @@ function StepBadge({ active, number, label }: StepBadgeProps) {
   );
 }
 
-interface StepLineProps {
-  active: boolean;
-}
-
-function StepLine({ active }: StepLineProps) {
+function StepLine({ active }: { active: boolean }) {
   return (
     <div
       className={
