@@ -138,7 +138,7 @@ export default function Page() {
   }
 
   /* ---------------------------------------------------------
-     GENERATE LEARNING PLAN
+     GENERATE PLAN
   --------------------------------------------------------- */
 
   async function handleGenerate() {
@@ -171,7 +171,6 @@ export default function Page() {
 
   async function handleDownload() {
     if (!fileId || !editableText.trim()) return;
-
     setIsDownloading(true);
     try {
       await downloadPlanPdf(fileId, editableText);
@@ -227,7 +226,9 @@ export default function Page() {
           </p>
 
           <div className="mt-4">
-            <p className="text-sm">Original language: {analysis.document_language}</p>
+            <p className="text-sm">
+              Original language: {analysis.document_language}
+            </p>
 
             <LanguageSelector
               value={planLanguage}
