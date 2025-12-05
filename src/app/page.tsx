@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useDots } from '@/hooks/useDots';
+
 import FileDropzone from '@/components/FileDropzone';
 import LanguageSelector from '@/components/LanguageSelector';
+import StudyPlanViewer from '@/components/StudyPlanViewer';
+import ProgressBar from '@/components/ProgressBar';
 
 import {
   uploadStudyFile,
@@ -13,12 +16,10 @@ import {
   getAnalysisStatus,
 } from '@/lib/api';
 
-import StudyPlanViewer from '@/components/StudyPlanViewer';
-import ProgressBar from '@/components/ProgressBar';
 import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
-   BACKEND STATUS → PROGRESS MAP
+   BACKEND STATUS MAP
 --------------------------------------------------------- */
 
 const STATUS_PROGRESS_MAP: Record<string, number> = {
@@ -71,10 +72,11 @@ export default function HomePage() {
   const [fileId, setFileId] = useState<string | null>(null);
 
   const [analysis, setAnalysis] = useState<AnalysisBlock | null>(null);
+  const [recommendedDays, setRecommendedDays] = useState<number | null>(null);
   const [days, setDays] = useState<number>(7);
 
   const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState<number>(0);
+  const [progress, setProgress] = useState<number>(0);
 
   const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
   const [editableText, setEditableText] = useState<string>('');
@@ -88,13 +90,13 @@ export default function HomePage() {
     status === 'uploading' || status === 'analyzing' || status === 'generating';
 
   /* ---------------------------------------------------------
-     TIMER
+     TIMER FOR GENERATION
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (status !== 'generating') return;
-    setElapsedSeconds(0);
 
+    setElapsedSeconds(0);
     const timer = setInterval(() => {
       setElapsedSeconds((x) => x + 1);
     }, 1000);
@@ -110,30 +112,24 @@ export default function HomePage() {
     if (!fileId || status !== 'analyzing') return;
 
     const interval = setInterval(async () => {
-      try {
-        const st = await getAnalysisStatus(fileId);
+      const st = await getAnalysisStatus(fileId);
 
-        if (st?.status) {
-          setAnalysisStatus(st.status);
+      if (st?.status) {
+        setAnalysisStatus(st.status);
 
-          if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
-            setAnalysisProgress((p) =>
-              Math.max(p, STATUS_PROGRESS_MAP[st.status]),
-            );
-          }
+        if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
+          setProgress((p) => Math.max(p, STATUS_PROGRESS_MAP[st.status]));
         }
+      }
 
-        if (st?.status === 'ready') {
-          clearInterval(interval);
-          setStatus('idle');
-        }
+      if (st?.status === 'ready') {
+        clearInterval(interval);
+        setStatus('idle');
+      }
 
-        if (st?.status === 'error') {
-          clearInterval(interval);
-          setStatus('error');
-        }
-      } catch (err) {
-        console.error(err);
+      if (st?.status === 'error') {
+        clearInterval(interval);
+        setStatus('error');
       }
     }, 2000);
 
@@ -141,14 +137,14 @@ export default function HomePage() {
   }, [fileId, status]);
 
   /* ---------------------------------------------------------
-     SMOOTH PROGRESS BAR FILL
+     SOFT PROGRESS BAR
   --------------------------------------------------------- */
 
   useEffect(() => {
     if (status !== 'analyzing') return;
 
     const timer = setInterval(() => {
-      setAnalysisProgress((prev) => Math.min(prev + 2, 85));
+      setProgress((p) => Math.min(p + 2, 85));
     }, 700);
 
     return () => clearInterval(timer);
@@ -163,24 +159,26 @@ export default function HomePage() {
     setError(null);
     setPlan(null);
     setAnalysis(null);
-    setFileId(null);
     setEditableText('');
-    setAnalysisStatus('uploading');
+    setProgress(0);
+    setAnalysisStatus(null);
+    setPlanLanguage('en');
 
     try {
       setStatus('uploading');
-      setAnalysisProgress(5);
+      setProgress(5);
 
       const up = await uploadStudyFile(file);
       setFileId(up.file_id);
 
       setStatus('analyzing');
       setAnalysisStatus('uploaded');
-      setAnalysisProgress(10);
+      setProgress(10);
 
       const res = await analyze(up.file_id);
 
       setAnalysis(res.analysis);
+      setRecommendedDays(res.analysis.recommended_days || 7);
       setDays(res.analysis.recommended_days || 7);
 
       setStatus('idle');
@@ -200,14 +198,18 @@ export default function HomePage() {
 
     try {
       setStatus('generating');
-      setError(null);
 
       const generated = await generatePlan(fileId, days, planLanguage);
 
-      if (!generated.plan?.days) throw new Error('Bad plan format');
+      if (!generated?.plan?.days) {
+        setError('Invalid plan format');
+        setStatus('error');
+        return;
+      }
 
       setPlan(generated);
       setEditableText(planToText(generated));
+
       setStatus('ready');
     } catch (err) {
       console.error(err);
@@ -230,29 +232,23 @@ export default function HomePage() {
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-
       a.href = url;
       a.download = `learnscaffold-plan-${days}-days.pdf`;
       a.click();
-
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      setError('PDF error');
     } finally {
       setIsDownloading(false);
     }
   };
 
   /* ---------------------------------------------------------
-     STATUS LABEL (with dots)
+     STATUS LABEL WITH DOTS
   --------------------------------------------------------- */
 
   const dots = useDots();
-  const baseLabel = STATUS_LABELS[analysisStatus || status] || '...';
+  const baseLabel = STATUS_LABELS[analysisStatus || status] || '';
   const uiLabel =
-    ['idle', 'ready', 'error'].includes(status) ||
-    (analysisStatus && ['ready', 'error'].includes(analysisStatus))
+    status === 'idle' || status === 'ready' || status === 'error'
       ? baseLabel
       : baseLabel + dots;
 
@@ -262,19 +258,19 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-3xl px-4 py-8">
+      <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col min-h-screen">
         <header className="mb-8 flex justify-between text-sm">
           <strong>LearnScaffold MVP</strong>
           <span className="text-slate-400">v0.8.1</span>
         </header>
 
-        {/* ================== UPLOAD ================== */}
+        {/* ===================== UPLOAD ===================== */}
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-semibold">Upload a textbook or video</h1>
 
           <div className="mt-6">
             <FileDropzone
-              onFileUpload={(file) => {
+              onFileSelected={(file) => {
                 if (!isBusy) handleFileSelected(file);
               }}
             />
@@ -282,25 +278,25 @@ export default function HomePage() {
 
           {(status === 'uploading' || status === 'analyzing') && (
             <div className="mt-4">
-              <ProgressBar progress={analysisProgress} status={uiLabel} />
+              <ProgressBar progress={progress} status={uiLabel} />
             </div>
           )}
 
-          {error && <p className="text-red-400 mt-3 text-xs">{error}</p>}
+          {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
         </section>
 
-        {/* ================== ANALYSIS ================== */}
+        {/* ===================== ANALYSIS ===================== */}
         {analysis && (
           <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
             <h2 className="text-lg font-semibold">Learning plan settings</h2>
 
-            <div className="mt-3">
-              <p className="text-sm">Document type: {analysis.document_type}</p>
-              <p className="text-sm">Level: {analysis.level}</p>
-            </div>
+            <p className="text-sm mt-2">
+              Document type: {analysis.document_type}
+            </p>
+            <p className="text-sm">Level: {analysis.level}</p>
 
             <div className="mt-4">
-              <label className="text-xs uppercase text-slate-300">
+              <label className="text-xs uppercase text-sky-300">
                 Lessons count
               </label>
               <input
@@ -314,13 +310,12 @@ export default function HomePage() {
             </div>
 
             <div className="mt-4">
-              <label className="text-xs uppercase text-slate-300">
+              <label className="text-xs uppercase text-sky-300">
                 Plan language
               </label>
               <LanguageSelector
                 value={planLanguage}
-                original="auto"
-                onChange={(l) => setPlanLanguage(l)}
+                onChange={setPlanLanguage}
               />
             </div>
 
@@ -334,26 +329,29 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ================== FINAL PLAN ================== */}
+        {/* ===================== FINAL PLAN ===================== */}
         {plan?.plan?.days && (
           <section className="mt-6">
             <div className="rounded-3xl border border-emerald-500/30 bg-emerald-950/30 p-6">
               <h2 className="text-lg font-semibold">Day-by-day structure</h2>
-              <div className="mt-4 bg-black/20 rounded-2xl p-4">
-                <StudyPlanViewer plan={plan.plan} />
+
+              <div className="mt-4 rounded-2xl bg-black/20 p-4">
+                <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
               </div>
             </div>
 
             <div className="mt-4 rounded-3xl border bg-white/5 p-6">
+              <h3 className="text-base font-semibold">Editable plan</h3>
+
               <textarea
-                className="w-full h-80 bg-white text-black p-4 rounded-xl"
+                className="w-full h-80 bg-white text-black p-4 rounded-xl mt-3"
                 value={editableText}
                 onChange={(e) => setEditableText(e.target.value)}
               />
 
               <button
                 className="mt-3 rounded-full bg-emerald-500 text-black px-4 py-2 text-xs font-bold"
-                disabled={!editableText || !fileId || isDownloading}
+                disabled={!editableText || isDownloading}
                 onClick={handleDownloadPdf}
               >
                 {isDownloading ? 'Generating PDF…' : 'Download PDF'}
@@ -361,6 +359,10 @@ export default function HomePage() {
             </div>
           </section>
         )}
+
+        <footer className="mt-auto pt-8 text-xs text-slate-500">
+          © {new Date().getFullYear()} LearnScaffold. Internal prototype.
+        </footer>
       </div>
     </main>
   );
