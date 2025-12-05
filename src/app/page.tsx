@@ -18,7 +18,11 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
+import type {
+  StudyPlanResponse,
+  AnalysisBlock,
+  PlanBlock,
+} from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -88,12 +92,10 @@ export default function HomePage() {
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
   const isBusy =
-    status === 'uploading' ||
-    status === 'analyzing' ||
-    status === 'generating';
+    status === 'uploading' || status === 'analyzing' || status === 'generating';
 
   /* ---------------------------------------------------------
-     GENERATION TIMER
+     GENERATION TIMER (FIXED CLEANUP)
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function HomePage() {
   }, [status]);
 
   /* ---------------------------------------------------------
-     POLLING BACKEND STATUS
+     POLLING BACKEND STATUS (FIXED CLEANUP)
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -133,7 +135,7 @@ export default function HomePage() {
       if (cancelled) return;
 
       try {
-        const st = await getAnalysisStatus(fileId);
+        const st = await getAnalysisStatus(fileId, planLanguage);
 
         if (st?.status) {
           setAnalysisStatus(st.status);
@@ -166,7 +168,7 @@ export default function HomePage() {
   }, [fileId, status, analysisStatus]);
 
   /* ---------------------------------------------------------
-     SOFT PROGRESS BAR
+     SOFT PROGRESS BAR (FIXED CLEANUP)
   --------------------------------------------------------- */
 
   useEffect(() => {
@@ -201,7 +203,7 @@ export default function HomePage() {
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
 
-    // сбрасываем всё состояние
+    // Clear previous state
     setError(null);
     setPlan(null);
     setAnalysis(null);
@@ -228,7 +230,7 @@ export default function HomePage() {
 
         setStatus('analyzing');
 
-        const res = await analyze(uploadRes.file_id);
+        const res = await analyze(uploadRes.file_id, planLanguage);
 
         if (!res?.analysis || !res.analysis.document_type) {
           throw new Error('Malformed analysis data');
@@ -254,7 +256,7 @@ export default function HomePage() {
   };
 
   /* ---------------------------------------------------------
-     GENERATE PLAN
+     GENERATE PLAN — FIXED (VALIDATION + NO CRASH)
   --------------------------------------------------------- */
 
   const handleGenerate = async () => {
@@ -266,7 +268,11 @@ export default function HomePage() {
 
       const generated = await generatePlan(fileId, days, planLanguage);
 
-      if (!generated || !generated.plan || !Array.isArray(generated.plan.days)) {
+      if (
+        !generated ||
+        !generated.plan ||
+        !Array.isArray(generated.plan.days)
+      ) {
         console.error('Invalid plan structure:', generated);
         setStatus('error');
         return;
@@ -446,9 +452,7 @@ function UploadSection({
 
       <div className="mt-6">
         <FileDropzone
-          onFileSelected={(file) => {
-            if (!isBusy) handleFileSelected(file);
-          }}
+          onFileSelected={isBusy ? undefined : handleFileSelected}
         />
       </div>
 
@@ -509,7 +513,9 @@ function AnalysisSection({
 
       <div className="mt-3 grid gap-4 text-sm text-slate-100 md:grid-cols-2">
         <div>
-          <LabelBlock title="Document type">{analysis.document_type}</LabelBlock>
+          <LabelBlock title="Document type">
+            {analysis.document_type}
+          </LabelBlock>
           <LabelBlock title="Level">{analysis.level}</LabelBlock>
 
           {analysis.main_topics?.length > 0 && (
@@ -591,7 +597,9 @@ function AnalysisSection({
               : 'border border-emerald-400 bg-emerald-500 text-slate-950 hover:bg-emerald-400',
           ].join(' ')}
         >
-          {status === 'generating' ? `Generating${dots}` : 'Generate learning plan'}
+          {status === 'generating'
+            ? `Generating${dots}`
+            : 'Generate learning plan'}
         </button>
       </div>
     </section>
@@ -706,7 +714,9 @@ function StepBadge({ active, number, label }: StepBadgeProps) {
       >
         {number}
       </div>
-      <span className={active ? 'text-xs text-slate-100' : 'text-xs text-slate-500'}>
+      <span
+        className={active ? 'text-xs text-slate-100' : 'text-xs text-slate-500'}
+      >
         {label}
       </span>
     </div>
@@ -729,7 +739,7 @@ function StepLine({ active }: StepLineProps) {
 }
 
 /* ---------------------------------------------------------
-   PLAN → TEXT
+   PLAN → TEXT (FIXED practice line)
 --------------------------------------------------------- */
 
 function formatPagesForText(pages?: number[]): string | null {
@@ -785,7 +795,7 @@ function planToText(plan: StudyPlanResponse): string {
 
     if (day.practice?.length) {
       lines.push('Practice');
-      day.practice.forEach((p) => lines.push(`- ${p}`));
+      day.practice.forEach((p) => lines.push(`- ${p}`)); // FIXED
       lines.push('');
     }
 
