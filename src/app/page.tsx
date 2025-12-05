@@ -1,24 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useDots } from '@/hooks/useDots';
-import FileDropzone from '@/components/FileDropzone';
-import LanguageSelector from '@/components/LanguageSelector';
-
 import {
   uploadStudyFile,
   analyze,
+  getAnalysisStatus,
   generatePlan,
   downloadPlanPdf,
-  getAnalysisStatus,
 } from '@/lib/api';
 
-import StudyPlanViewer from '@/components/StudyPlanViewer';
+import FileDropzone from '@/components/FileDropzone';
+import LanguageSelector from '@/components/LanguageSelector';
 import ProgressBar from '@/components/ProgressBar';
-import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
+import StudyPlanViewer from '@/components/StudyPlanViewer';
+import { useDots } from '@/hooks/useDots';
+
+import type {
+  StudyPlanResponse,
+  AnalysisBlock,
+  PlanBlock,
+  PlanDay,
+} from '@/types/studyplan';
 
 /* ---------------------------------------------------------
-   BACKEND STATUS → PROGRESS MAP
+   FRONTEND PROGRESS MAP
 --------------------------------------------------------- */
 
 const STATUS_PROGRESS_MAP: Record<string, number> = {
@@ -27,118 +32,142 @@ const STATUS_PROGRESS_MAP: Record<string, number> = {
   analyzing: 20,
   extracting: 35,
   extracting_pages: 35,
-  text_extracting: 50,
   extracting_text: 50,
+  text_extracting: 50,
   cleaning: 60,
   chunking: 70,
   classifying: 80,
   structure: 90,
-  building_structure: 90,
   ready: 100,
   error: 100,
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  uploading: 'Uploading…',
-  uploaded: 'Uploaded',
+  uploading: 'Uploading file…',
+  uploaded: 'File uploaded',
   analyzing: 'Analyzing…',
-  extracting: 'Extracting…',
+  extracting: 'Extracting pages…',
   extracting_pages: 'Extracting pages…',
-  text_extracting: 'Extracting text…',
   extracting_text: 'Extracting text…',
+  text_extracting: 'Extracting text…',
   cleaning: 'Cleaning text…',
-  chunking: 'Chunking…',
-  classifying: 'Classifying…',
+  chunking: 'Chunking content…',
+  classifying: 'Classifying document…',
   structure: 'Extracting structure…',
-  building_structure: 'Building structure…',
-  ready: 'Ready for plan generation',
+  ready: 'Analysis complete',
   error: 'Error',
 };
 
 /* ---------------------------------------------------------
-   MAIN COMPONENT
+   MAIN PAGE COMPONENT
 --------------------------------------------------------- */
 
 export default function Page() {
-  const dots = useDots();
-
-  const [file, setFile] = useState<File | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
-
   const [analysis, setAnalysis] = useState<AnalysisBlock | null>(null);
-  const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
 
-  const [progress, setProgress] = useState<number>(0);
   const [status, setStatus] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number>(0);
 
   const [planLanguage, setPlanLanguage] = useState<string>('en');
-  const [editableText, setEditableText] = useState<string>('');
+
   const [isBusy, setIsBusy] = useState(false);
+  const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
+  const [editableText, setEditableText] = useState('');
+
   const [isDownloading, setIsDownloading] = useState(false);
+  const dots = useDots(status);
 
   /* ---------------------------------------------------------
-     POLLING STATUS
+     POLLING ANALYSIS
   --------------------------------------------------------- */
 
-  function startPolling(id: string) {
+  useEffect(() => {
+    if (!fileId) return;
+
     let timer: ReturnType<typeof setInterval> | null = null;
 
-    timer = setInterval(async () => {
-      try {
-        const res = await getAnalysisStatus(id);
-        if (!res?.status) return;
+    if (status && status !== 'ready' && status !== 'error') {
+      timer = setInterval(async () => {
+        try {
+          const st = await getAnalysisStatus(fileId);
+          if (!st) return;
 
-        const backendStatus = res.status.toLowerCase();
-        setStatus(backendStatus);
+          const { status: s } = st;
 
-        const mapped = STATUS_PROGRESS_MAP[backendStatus];
-        if (mapped !== undefined) setProgress(mapped);
+          setStatus(s);
+          setProgress(STATUS_PROGRESS_MAP[s] ?? 0);
 
-        if (backendStatus === 'error' || backendStatus === 'ready') {
-          clearInterval(timer!);
-          timer = null;
-
-          if (backendStatus === 'error') {
-            setIsBusy(false);
+          if (s === 'ready' || s === 'error') {
+            if (timer) clearInterval(timer);
           }
-
-          if (backendStatus === 'ready') {
-            const result = await analyze(id);
-            setAnalysis(result);
-            setIsBusy(false);
-          }
+        } catch (err) {
+          console.error('Polling failed', err);
         }
-      } catch (_) {}
-    }, 1200);
-  }
+      }, 1200);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [fileId, status]);
 
   /* ---------------------------------------------------------
-     FILE UPLOAD
+     UPLOAD HANDLER
   --------------------------------------------------------- */
 
-  async function handleUpload() {
-    if (!file) return;
-
-    setIsBusy(true);
+  async function handleUpload(file: File) {
     setStatus('uploading');
     setProgress(5);
 
-    const res = await uploadStudyFile(file);
+    try {
+      const resp = await uploadStudyFile(file);
+      setFileId(resp.file_id);
 
-    if (!res?.file_id) {
+      setStatus('uploaded');
+      setProgress(10);
+    } catch (err) {
+      console.error(err);
       setStatus('error');
-      setIsBusy(false);
-      return;
     }
-
-    setFileId(res.file_id);
-    setStatus('uploaded');
-    setProgress(10);
-    startPolling(res.file_id);
   }
 
   /* ---------------------------------------------------------
-     GENERATE PLAN
+     START ANALYSIS
+  --------------------------------------------------------- */
+
+  async function handleAnalyze() {
+    if (!fileId) return;
+
+    setStatus('analyzing');
+    setProgress(20);
+
+    try {
+      const resp = await analyze(fileId);
+
+      if (!resp || !resp.analysis) {
+        setStatus('error');
+        return;
+      }
+
+      setAnalysis({
+        ...resp.analysis,
+        document_language: resp.analysis.document_language || 'en',
+      });
+
+      setPlanLanguage(
+        resp.analysis.document_language === 'en'
+          ? 'en'
+          : 'en'
+      );
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+    }
+  }
+
+  /* ---------------------------------------------------------
+     GENERATE LEARNING PLAN
   --------------------------------------------------------- */
 
   async function handleGenerate() {
@@ -148,20 +177,30 @@ export default function Page() {
     setStatus('generating');
     setProgress(0);
 
-    const resp = await generatePlan({
-      file_id: fileId,
-      days: analysis.recommended_days || 10,
-      language: planLanguage,
-    });
+    const days = analysis.recommended_days || 10;
 
-    if (!resp || !resp.plan) {
+    try {
+      const resp = await generatePlan(
+        fileId,
+        days,
+        planLanguage
+      );
+
+      if (!resp || !resp.plan) {
+        setStatus('error');
+        setIsBusy(false);
+        return;
+      }
+
+      setPlan(resp);
+      setEditableText(resp.plan_text || '');
+      setStatus('ready');
+      setProgress(100);
+    } catch (err) {
+      console.error(err);
       setStatus('error');
-      setIsBusy(false);
-      return;
     }
 
-    setPlan(resp);
-    setEditableText(resp.plan_text || '');
     setIsBusy(false);
   }
 
@@ -169,14 +208,26 @@ export default function Page() {
      DOWNLOAD PDF
   --------------------------------------------------------- */
 
-  async function handleDownload() {
-    if (!fileId || !editableText.trim()) return;
+  async function handleDownloadPdf() {
+    if (!editableText.trim() || !fileId || !plan) return;
     setIsDownloading(true);
+
     try {
-      await downloadPlanPdf(fileId, editableText);
-    } finally {
-      setIsDownloading(false);
+      const blob = await downloadPlanPdf(editableText, fileId, plan.days);
+
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'study-plan.pdf';
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
     }
+
+    setIsDownloading(false);
   }
 
   /* ---------------------------------------------------------
@@ -184,26 +235,26 @@ export default function Page() {
   --------------------------------------------------------- */
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10 text-white">
-      <h1 className="text-center text-3xl font-bold">LearnScaffold</h1>
-      <p className="mt-2 text-center text-sm text-white/70">
-        AI-powered study plan generator
-      </p>
+    <main className="mx-auto max-w-3xl px-4 py-10 text-white">
+      <h1 className="text-3xl font-bold">LearnScaffold — AI Study Plan Generator</h1>
 
-      {/* Upload Section */}
-      <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
-        <FileDropzone file={file} setFile={setFile} />
-        <button
-          className="mt-4 w-full rounded-xl bg-emerald-500 py-3 font-semibold text-black"
-          onClick={handleUpload}
-          disabled={!file || isBusy}
-        >
-          {isBusy && status !== 'ready' ? 'Processing…' : 'Upload'}
-        </button>
+      {/* Upload */}
+      <section className="mt-8">
+        <FileDropzone onFileUpload={handleUpload} />
       </section>
 
-      {/* Progress Section */}
-      {status && status !== 'ready' && (
+      {/* Analyze button */}
+      {fileId && !analysis && (
+        <button
+          onClick={handleAnalyze}
+          className="mt-6 rounded-full bg-emerald-500 px-4 py-2 font-semibold text-slate-900"
+        >
+          Start analysis
+        </button>
+      )}
+
+      {/* Progress */}
+      {status && status !== 'ready' && status !== 'error' && (
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <p className="text-sm text-white/80">
             {STATUS_LABELS[status] || status} {dots}
@@ -212,74 +263,62 @@ export default function Page() {
         </section>
       )}
 
-      {/* Analysis Section */}
+      {/* Analysis result */}
       {analysis && (
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <p className="text-xs uppercase tracking-wide text-emerald-300/80">
-            Document analysis
+        <section className="mt-8 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
+          <h2 className="text-lg font-semibold">Document analysis</h2>
+
+          <p className="mt-2 text-sm">
+            Document type: <strong>{analysis.document_type}</strong>
           </p>
 
-          <h2 className="mt-1 text-lg font-semibold">{analysis.document_type}</h2>
-
-          <p className="mt-3 text-sm text-white/70">
-            {analysis.short_description}
+          <p className="mt-2 text-sm">
+            Level: <strong>{analysis.level}</strong>
           </p>
 
-          <div className="mt-4">
-            <p className="text-sm">
-              Original language: {analysis.document_language}
-            </p>
+          <p className="mt-2 text-sm">
+            Recommended days: <strong>{analysis.recommended_days}</strong>
+          </p>
 
-            <LanguageSelector
-              value={planLanguage}
-              original={analysis.document_language}
-              onChange={(lang) => setPlanLanguage(lang)}
-            />
+          <LanguageSelector
+            value={planLanguage}
+            original={analysis.document_language || 'en'}
+            onChange={(v) => setPlanLanguage(v)}
+          />
 
-            <button
-              className="mt-4 w-full rounded-xl bg-emerald-500 py-3 font-semibold text-black"
-              disabled={isBusy}
-              onClick={handleGenerate}
-            >
-              Generate Study Plan
-            </button>
-          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={isBusy}
+            className="mt-4 rounded-full bg-white px-4 py-2 font-semibold text-slate-900"
+          >
+            Generate Study Plan
+          </button>
         </section>
       )}
 
       {/* Final Plan */}
       {plan && (
-        <>
-          <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
-            <p className="text-xs uppercase tracking-wide text-emerald-300/80">
-              Final plan
-            </p>
+        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-xl font-semibold">Final learning plan</h2>
 
-            <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
+          <div className="mt-4 rounded-2xl bg-black/20 p-4">
+            <StudyPlanViewer plan={{ days: plan.plan?.days || [] }} />
+          </div>
 
-            <div className="mt-4 rounded-2xl bg-black/20 p-4">
-              <StudyPlanViewer plan={{ days: plan.plan?.days || [] }} />
-            </div>
-          </section>
+          <textarea
+            className="mt-4 h-72 w-full rounded-xl bg-white p-4 text-black"
+            value={editableText}
+            onChange={(e) => setEditableText(e.target.value)}
+          />
 
-          <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="text-base font-semibold">Editable learning plan text</h2>
-
-            <textarea
-              className="mt-3 h-80 w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm text-slate-900"
-              value={editableText}
-              onChange={(e) => setEditableText(e.target.value)}
-            />
-
-            <button
-              className="mt-4 w-full rounded-xl bg-emerald-500 py-3 font-semibold text-black"
-              disabled={!editableText.trim() || isDownloading}
-              onClick={handleDownload}
-            >
-              {isDownloading ? 'Generating PDF…' : 'Download PDF'}
-            </button>
-          </section>
-        </>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={!editableText.trim() || isDownloading}
+            className="mt-4 rounded-full bg-emerald-400 px-4 py-2 font-semibold text-slate-900"
+          >
+            {isDownloading ? 'Generating PDF…' : 'Download PDF'}
+          </button>
+        </section>
       )}
     </main>
   );
