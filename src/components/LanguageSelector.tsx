@@ -1,3 +1,5 @@
+'use client';
+
 interface Props {
   value: string;
   original?: string;
@@ -12,9 +14,15 @@ export default function LanguageSelector({ value, original, onChange }: Props) {
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="en">English (default)</option>
-      {original !== 'en' && (
+
+      {original && original !== 'en' && (
         <option value={original}>Original: {original.toUpperCase()}</option>
       )}
+
+      <option value="ru">Russian</option>
+      <option value="es">Spanish</option>
+      <option value="de">German</option>
+      <option value="fr">French</option>
     </select>
   );
 }
