@@ -53,7 +53,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
           </h4>
 
           {/* Goals */}
-          {day.goals?.length > 0 && (
+          {Array.isArray(day.goals) && day.goals.length > 0 && (
             <div className="mt-3">
               <div className="text-xs font-semibold text-slate-300 uppercase">
                 Goals
@@ -67,7 +67,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
           )}
 
           {/* Theory */}
-          {day.theory && (
+          {typeof day.theory === 'string' && day.theory.trim().length > 0 && (
             <div className="mt-3">
               <div className="text-xs font-semibold text-slate-300 uppercase">
                 Theory
@@ -77,7 +77,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
           )}
 
           {/* Practice */}
-          {day.practice?.length > 0 && (
+          {Array.isArray(day.practice) && day.practice.length > 0 && (
             <div className="mt-3">
               <div className="text-xs font-semibold text-slate-300 uppercase">
                 Practice
@@ -91,7 +91,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
           )}
 
           {/* Summary */}
-          {day.summary && (
+          {typeof day.summary === 'string' && day.summary.trim().length > 0 && (
             <div className="mt-3">
               <div className="text-xs font-semibold text-slate-300 uppercase">
                 Daily Summary
@@ -101,7 +101,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
           )}
 
           {/* Quiz */}
-          {day.quiz?.length > 0 && (
+          {Array.isArray(day.quiz) && day.quiz.length > 0 && (
             <div className="mt-3">
               <div className="text-xs font-semibold text-slate-300 uppercase">
                 Quiz
