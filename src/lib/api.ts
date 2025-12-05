@@ -53,7 +53,7 @@ export async function getAnalysisStatus(fileId: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE LEARNING PLAN (AUTO-NORMALIZATION FIX)
+   GENERATE LEARNING PLAN
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -86,72 +86,47 @@ export async function generatePlan(
 
   console.log("RAW PLAN RESPONSE:", JSON.stringify(json, null, 2));
 
-
-  /* ---------------------------------------------------------
-     ANALYSIS VALIDATION
-  --------------------------------------------------------- */
-  if (!json.analysis || typeof json.analysis !== "object") {
-    console.error("Bad analysis:", json);
-    throw new Error("Invalid analysis block");
-  }
-
-  /* ---------------------------------------------------------
-     PLAN STRUCTURE NORMALIZATION
-     Backend might return:
-        plan: {0:{},1:{}} → we convert to array
-        plan: [...] → ok
-        plan: {days:[...]} → ok
-  --------------------------------------------------------- */
-
+  /* Normalize plan.days */
   let normalizedDays: any[] = [];
 
   if (Array.isArray(json.plan)) {
-    // plan is array itself
     normalizedDays = json.plan;
-
   } else if (json.plan && Array.isArray(json.plan.days)) {
-    // correct format
     normalizedDays = json.plan.days;
-
   } else if (json.plan && typeof json.plan === "object") {
-    // convert "object of objects" → array
-    const values = Object.values(json.plan);
-    if (values.length > 0 && typeof values[0] === "object") {
-      normalizedDays = values;
-    }
+    normalizedDays = Object.values(json.plan);
   }
 
-  // FINAL CHECK
   if (!Array.isArray(normalizedDays)) {
-    console.error("Invalid plan.days structure:", json.plan);
-    throw new Error("Invalid plan structure: cannot extract days array");
+    throw new Error("Invalid plan structure");
   }
 
-  // APPLY NORMALIZED STRUCTURE
   json.plan = { days: normalizedDays };
 
   return json;
 }
 
 /* ---------------------------------------------------------
-   DOWNLOAD PDF
+   DOWNLOAD PDF (FIXED)
 --------------------------------------------------------- */
 export async function downloadPlanPdf(
-  text: string,
   fileId: string,
-  days: number
+  text: string,
+  language: string
 ) {
   const res = await fetch(`${API_URL}/plan/pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       file_id: fileId,
-      days,
       text,
+      language,
     }),
   });
 
   if (!res.ok) {
+    const txt = await res.text();
+    console.error("PDF ERROR:", txt);
     throw new Error("PDF generation failed");
   }
 
