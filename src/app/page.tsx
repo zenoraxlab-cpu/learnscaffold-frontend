@@ -555,6 +555,7 @@ function AnalysisSection({
             <LanguageSelector
               value={planLanguage}
               onChange={(lang) => setPlanLanguage(lang)}
+              original={analysis?.document_language || 'auto'}
             />
           </div>
 
