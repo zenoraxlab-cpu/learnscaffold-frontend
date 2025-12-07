@@ -24,18 +24,21 @@ export type PlanBlock = {
 
 export type AnalysisBlock = {
   document_type: string;
-  level: string;
+  level?: string;
   main_topics: string[];
   summary?: string;
   recommended_days?: number;
-  document_language?: string; // <-- ДОБАВЛЕНО
+  document_language?: string;
 };
 
 export type StudyPlanResponse = {
   status: string;
-  file_id: string;
-  days: number;
-  analysis: AnalysisBlock;
-  structure: unknown[];
+  file_id?: string;
+  days?: number;
+
+  // MUST BE OPTIONAL — generate() does NOT return them
+  analysis?: AnalysisBlock;
+  structure?: unknown[];
+
   plan: PlanBlock;
 };
