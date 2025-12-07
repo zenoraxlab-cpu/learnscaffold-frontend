@@ -1,3 +1,5 @@
+// src/lib/api.ts
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://learnscaffold-backend-ocr.onrender.com';
@@ -25,7 +27,7 @@ export async function uploadStudyFile(file: File) {
    START ANALYSIS
 --------------------------------------------------------- */
 export async function analyze(fileId: string) {
-  const res = await fetch(`${API_URL}/analyze`, {
+  const res = await fetch(`${API_URL}/analyze/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file_id: fileId }),
@@ -40,7 +42,7 @@ export async function analyze(fileId: string) {
 }
 
 /* ---------------------------------------------------------
-   GET STATUS
+   GET ANALYSIS STATUS
 --------------------------------------------------------- */
 export async function getAnalysisStatus(fileId: string, language: string) {
   const res = await fetch(
@@ -55,7 +57,7 @@ export async function getAnalysisStatus(fileId: string, language: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE PLAN — корректная версия
+   GENERATE LEARNING PLAN (БЕЗ проверки analysis)
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -77,41 +79,45 @@ export async function generatePlan(
     throw new Error(`Generate failed (${res.status}): ${txt}`);
   }
 
-  const json: any = await res.json();
+  let json: any;
+
+  try {
+    json = await res.json();
+  } catch (e) {
+    console.error('JSON parse error:', e);
+    throw new Error('Invalid JSON from backend');
+  }
 
   console.log('RAW PLAN RESPONSE:', JSON.stringify(json, null, 2));
 
-  /* ---------------------------------------------------------
-     1. НЕ проверяем json.analysis — его НЕТ в этом endpoint
-     (analysis приходит только из /analyze)
-  --------------------------------------------------------- */
+  // /generate НЕ возвращает analysis — только { status, days, plan }
+  if (!json.plan) {
+    console.error("Missing 'plan' in backend response:", json);
+    throw new Error('Backend did not return a learning plan');
+  }
 
-  /* ---------------------------------------------------------
-     2. Нормализация структуры плана
-  --------------------------------------------------------- */
+  // Нормализуем структуру плана
   let normalizedDays: any[] = [];
 
-  // Вариант: plan: [...]
   if (Array.isArray(json.plan)) {
+    // план сразу как массив
     normalizedDays = json.plan;
-  }
-
-  // Вариант: plan: { days: [...] }
-  else if (json.plan && Array.isArray(json.plan.days)) {
+  } else if (json.plan && Array.isArray(json.plan.days)) {
+    // { plan: { days: [...] } }
     normalizedDays = json.plan.days;
-  }
-
-  // Вариант: plan: {0:{},1:{}} → превращаем в массив
-  else if (json.plan && typeof json.plan === 'object') {
-    normalizedDays = Object.values(json.plan);
+  } else if (json.plan && typeof json.plan === 'object') {
+    // объект дней → массив
+    const values = Object.values(json.plan);
+    if (values.length > 0 && typeof values[0] === 'object') {
+      normalizedDays = values;
+    }
   }
 
   if (!Array.isArray(normalizedDays)) {
-    console.error('Invalid plan format:', json);
-    throw new Error('Plan format invalid: cannot extract days array');
+    console.error('Invalid plan.days structure:', json.plan);
+    throw new Error('Invalid plan structure: cannot extract days array');
   }
 
-  // Итоговая структура, которую ожидает фронтенд
   json.plan = { days: normalizedDays };
 
   return json;
@@ -141,4 +147,3 @@ export async function downloadPlanPdf(
 
   return res.blob();
 }
-// rebuild hotfix 2025-12-07
