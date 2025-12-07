@@ -197,33 +197,31 @@ export default function HomePage() {
 
         const res = await analyze(uploadRes.file_id);
 
-        
+        // BACKEND NOW RETURNS analysis DIRECTLY
+        const analysisBlock = res.analysis ?? res;
 
-/** BACKEND NOW RETURNS analysis DIRECTLY */
-const analysisBlock = res.analysis ?? res;
+        if (analysisBlock?.document_type) {
+          setAnalysis(analysisBlock);
 
-if (!analysisBlock?.document_type) {
-  console.warn("No document_type in analysis block — skipping validation");
-} else {
-  setAnalysis(analysisBlock);
+          const rec =
+            analysisBlock.recommended_days && analysisBlock.recommended_days > 0
+              ? analysisBlock.recommended_days
+              : 7;
 
-  const rec =
-    analysisBlock.recommended_days && analysisBlock.recommended_days > 0
-      ? analysisBlock.recommended_days
-      : 7;
+          setRecommendedDays(rec);
+          setDays(rec);
+        } else {
+          console.warn('No analysis block received');
+        }
 
-  setRecommendedDays(rec);
-  setDays(rec);
-}
-
-setStatus('idle');
-})().catch((err) => {
-  console.error(err);
-  setError('Error during analysis');
-  setStatus('error');
-});
-}; // ←←← ЗАКРЫВАЕМ handleFileSelected ПРАВИЛЬНО!
-
+        setStatus('idle');
+      } catch (err) {
+        console.error(err);
+        setError('Error during analysis');
+        setStatus('error');
+      }
+    })();
+  };
 
   /* GENERATE PLAN */
   const handleGenerate = async () => {
