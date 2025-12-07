@@ -1,5 +1,3 @@
-// force rebuild 2025-02-XX
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -198,10 +196,8 @@ export default function HomePage() {
 
         const res = await analyze(uploadRes.file_id);
 
-        // Backend may return res.analysis OR full object
         const analysisBlock = res.analysis ?? res;
 
-        // Assign raw analysis without validation
         setAnalysis(analysisBlock);
 
         const rec =
@@ -238,7 +234,7 @@ export default function HomePage() {
       }
 
       setPlan(generated);
-      setEditableText(planToText(generated));
+      setEditableText(JSON.stringify(generated, null, 2));
       setStatus('ready');
     } catch (err) {
       console.error(err);
@@ -247,7 +243,7 @@ export default function HomePage() {
     }
   };
 
-  /* PDF */
+  /* PDF DOWNLOAD */
   const handleDownloadPdf = async () => {
     if (!editableText.trim() || !fileId) return;
 
@@ -280,7 +276,6 @@ export default function HomePage() {
   const showDots = !['ready', 'error', 'idle'].includes(statusKey);
   const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
 
-  /* UI */
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
@@ -288,7 +283,7 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Interface v0.8.3</div>
+          <div className="text-xs text-slate-400">Interface v0.9.0</div>
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
@@ -319,50 +314,47 @@ export default function HomePage() {
         </section>
 
         {analysis && (
-  <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
-    <h2 className="text-lg font-semibold">Learning plan settings</h2>
+          <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
+            <h2 className="text-lg font-semibold">Learning plan settings</h2>
 
-    <div className="mt-3 text-sm">
-      {analysis?.document_type && (
-        <p>Document type: {analysis.document_type}</p>
-      )}
+            <div className="mt-3 text-sm">
+              {analysis?.document_type && (
+                <p>Document type: {analysis.document_type}</p>
+              )}
 
-      {analysis?.document_language && (
-        <p>Language: {analysis.document_language}</p>
-      )}
+              {analysis?.document_language && (
+                <p>Language: {analysis.document_language}</p>
+              )}
 
-      {Array.isArray(analysis?.main_topics) && (
-        <p>Main topics: {analysis.main_topics.join(', ')}</p>
-      )}
+              {Array.isArray(analysis?.main_topics) && (
+                <p>Main topics: {analysis.main_topics.join(', ')}</p>
+              )}
 
-      {recommendedDays !== null && (
-        <p>Recommended days: {recommendedDays}</p>
-      )}
-    </div>
+              {recommendedDays !== null && (
+                <p>Recommended days: {recommendedDays}</p>
+              )}
+            </div>
 
-    <div className="mt-4">
-      <label className="text-xs">Days</label>
-      <input
-        type="number"
-        min={1}
-        max={90}
-        value={days}
-        onChange={(e) => setDays(Number(e.target.value))}
-        className="ml-3 rounded bg-slate-900 px-2"
-      />
-    </div>
+            <div className="mt-4">
+              <label className="text-xs">Days</label>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+                className="ml-3 rounded bg-slate-900 px-2"
+              />
+            </div>
 
-    <div className="mt-4">
-      <label className="text-xs">Plan language</label>
-      <LanguageSelector
-        value={planLanguage}
-        onChange={setPlanLanguage}
-        original={analysis?.document_language}
-      />
-    </div>
-  </section>
-)}
-
+            <div className="mt-4">
+              <label className="text-xs">Plan language</label>
+              <LanguageSelector
+                value={planLanguage}
+                onChange={setPlanLanguage}
+                original={analysis?.document_language}
+              />
+            </div>
 
             <button
               onClick={handleGenerate}
@@ -410,4 +402,5 @@ export default function HomePage() {
 function planToText(plan: StudyPlanResponse): string {
   return JSON.stringify(plan, null, 2);
 }
-// force rebuild Sun Dec  7 18:42:32 +07 2025
+
+// force rebuild Dec-07-2025
