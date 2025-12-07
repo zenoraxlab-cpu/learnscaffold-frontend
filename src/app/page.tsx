@@ -197,6 +197,10 @@ export default function HomePage() {
         setStatus('analyzing');
 
         const res = await analyze(uploadRes.file_id);
+        console.log(
+          '### RAW_ANALYZE_RESPONSE ###',
+          JSON.stringify(res, null, 2),
+        );
 
         const analysisBlock = res.analysis ?? res;
 
