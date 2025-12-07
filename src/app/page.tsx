@@ -319,36 +319,50 @@ export default function HomePage() {
         </section>
 
         {analysis && (
-          <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
-            <h2 className="text-lg font-semibold">Learning plan settings</h2>
+  <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
+    <h2 className="text-lg font-semibold">Learning plan settings</h2>
 
-            <div className="mt-3 text-sm">
-              <p>Document type: {analysis.document_type}</p>
-              <p>Language: {analysis.document_language}</p>
-              <p>Main topics: {(analysis.main_topics || []).join(', ')}</p>
-              <p>Recommended days: {recommendedDays}</p>
-            </div>
+    <div className="mt-3 text-sm">
+      {analysis?.document_type && (
+        <p>Document type: {analysis.document_type}</p>
+      )}
 
-            <div className="mt-4">
-              <label className="text-xs">Days</label>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={days}
-                onChange={(e) => setDays(Number(e.target.value))}
-                className="ml-3 rounded bg-slate-900 px-2"
-              />
-            </div>
+      {analysis?.document_language && (
+        <p>Language: {analysis.document_language}</p>
+      )}
 
-            <div className="mt-4">
-              <label className="text-xs">Plan language</label>
-              <LanguageSelector
-                value={planLanguage}
-                onChange={setPlanLanguage}
-                original={analysis.document_language}
-              />
-            </div>
+      {Array.isArray(analysis?.main_topics) && (
+        <p>Main topics: {analysis.main_topics.join(', ')}</p>
+      )}
+
+      {recommendedDays !== null && (
+        <p>Recommended days: {recommendedDays}</p>
+      )}
+    </div>
+
+    <div className="mt-4">
+      <label className="text-xs">Days</label>
+      <input
+        type="number"
+        min={1}
+        max={90}
+        value={days}
+        onChange={(e) => setDays(Number(e.target.value))}
+        className="ml-3 rounded bg-slate-900 px-2"
+      />
+    </div>
+
+    <div className="mt-4">
+      <label className="text-xs">Plan language</label>
+      <LanguageSelector
+        value={planLanguage}
+        onChange={setPlanLanguage}
+        original={analysis?.document_language}
+      />
+    </div>
+  </section>
+)}
+
 
             <button
               onClick={handleGenerate}
