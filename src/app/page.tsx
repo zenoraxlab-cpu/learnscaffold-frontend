@@ -1,4 +1,4 @@
-// force rebuild 2025-02-XX
+// force rebuild — full corrected file
 
 'use client';
 
@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 import { useDots } from '@/hooks/useDots';
 import FileDropzone from '@/components/FileDropzone';
 import LanguageSelector from '@/components/LanguageSelector';
-
 import {
   uploadStudyFile,
   analyze,
@@ -82,7 +81,6 @@ export default function HomePage() {
   const [editableText, setEditableText] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [planLanguage, setPlanLanguage] = useState<string>('en');
 
   const isBusy =
@@ -93,10 +91,7 @@ export default function HomePage() {
     let timer: any = null;
 
     if (status === 'generating') {
-      setElapsedSeconds(0);
-      timer = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
-    } else {
-      setElapsedSeconds(0);
+      timer = setInterval(() => setEditableText((s) => s), 1000);
     }
 
     return () => timer && clearInterval(timer);
@@ -106,15 +101,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!fileId || status !== 'analyzing') return;
 
-    const slowPhases = ['extracting', 'extracting_text', 'classifying'];
-    const pollInterval = slowPhases.includes(analysisStatus || '')
-      ? 3000
-      : 2000;
-
-    let cancelled = false;
     const interval = setInterval(async () => {
-      if (cancelled) return;
-
       try {
         const st = await getAnalysisStatus(fileId, planLanguage);
 
@@ -137,12 +124,9 @@ export default function HomePage() {
           setStatus('error');
         }
       } catch {}
-    }, pollInterval);
+    }, 2000);
 
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [fileId, status, analysisStatus]);
 
   /* SMOOTH PROGRESS BAR */
@@ -150,21 +134,7 @@ export default function HomePage() {
     if (status !== 'analyzing') return;
 
     setAnalysisProgress((p) => (p < 5 ? 5 : p));
-
-    const timer = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        const key = analysisStatus;
-        const target = STATUS_PROGRESS_MAP[key || ''] ?? prev;
-
-        if (target > prev) return target;
-        if (!key || target < 85) return Math.min(prev + 2, 85);
-
-        return prev;
-      });
-    }, 700);
-
-    return () => clearInterval(timer);
-  }, [status, analysisStatus]);
+  }, [status]);
 
   /* FILE UPLOAD + ANALYSIS */
   const handleFileSelected = (file: File) => {
@@ -197,12 +167,8 @@ export default function HomePage() {
         setStatus('analyzing');
 
         const res = await analyze(uploadRes.file_id);
-        console.log(
-          '### RAW_ANALYZE_RESPONSE ###',
-          JSON.stringify(res, null, 2),
-        );
 
-        const analysisBlock = res.analysis ?? res;
+        const analysisBlock = res.analysis ?? res; // FULL RAW ANALYSIS
 
         setAnalysis(analysisBlock);
 
@@ -240,10 +206,7 @@ export default function HomePage() {
       }
 
       setPlan(generated);
-
-      // Make the editable text HUMAN-READABLE instead of JSON
-      setEditableText(formatPlanForEditor(generated.plan.days));
-
+      setEditableText(JSON.stringify(generated, null, 2));
       setStatus('ready');
     } catch (err) {
       console.error(err);
@@ -285,15 +248,19 @@ export default function HomePage() {
   const showDots = !['ready', 'error', 'idle'].includes(statusKey);
   const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
 
-  /* UI */
+  /* ---------------------------------------------------------
+     UI
+  --------------------------------------------------------- */
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
+        {/* Header */}
         <header className="mb-8 flex items-center justify-between">
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Interface v0.8.3</div>
+          <div className="text-xs text-slate-400">Interface v0.9.0</div>
         </header>
 
         {/* Upload block */}
@@ -324,27 +291,44 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* Analysis block (original design restored) */}
+        {/* Analysis Block */}
         {analysis && (
           <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
-            <h2 className="text-lg font-semibold">Learning plan settings</h2>
+            <h2 className="text-lg font-semibold">Document analysis</h2>
 
-            <div className="mt-3 text-sm">
-              <p>Document type: {analysis.document_type}</p>
-              <p>Language: {analysis.document_language}</p>
-
-              {Array.isArray(analysis.main_topics) && (
+            <div className="mt-3 text-sm space-y-1">
+              {analysis.document_type && <p>Type: {analysis.document_type}</p>}
+              {analysis.document_language && (
+                <p>Language: {analysis.document_language}</p>
+              )}
+              {analysis.pages && <p>Pages: {analysis.pages}</p>}
+              {analysis.length_chars && (
+                <p>Characters: {analysis.length_chars}</p>
+              )}
+              {analysis.main_topics && (
                 <p>Main topics: {analysis.main_topics.join(', ')}</p>
               )}
-
-              {Array.isArray(analysis.source_pages) && (
-                <p>Source pages: {analysis.source_pages.join(', ')}</p>
+              {analysis.summary && (
+                <p className="text-slate-300 mt-2">
+                  <b>Summary:</b> {analysis.summary}
+                </p>
               )}
 
-              <p>Recommended days: {recommendedDays}</p>
+              {Array.isArray(analysis.structure) && (
+                <div className="mt-2">
+                  <b>Structure:</b>
+                  <ul className="list-disc ml-5 text-slate-300">
+                    {analysis.structure.map((s: any, i: number) => (
+                      <li key={i}>{s.title}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <p className="mt-2">Recommended days: {recommendedDays}</p>
             </div>
 
-            <div className="mt-4 flex items-center gap-4">
+            <div className="mt-4">
               <label className="text-xs">Days</label>
               <input
                 type="number"
@@ -352,7 +336,7 @@ export default function HomePage() {
                 max={90}
                 value={days}
                 onChange={(e) => setDays(Number(e.target.value))}
-                className="rounded bg-slate-900 px-2"
+                className="ml-3 rounded bg-slate-900 px-2"
               />
             </div>
 
@@ -375,13 +359,14 @@ export default function HomePage() {
           </section>
         )}
 
+        {/* Plan viewer */}
         {plan && (
           <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/30 p-6">
             <StudyPlanViewer analysis={analysis} plan={plan.plan} />
           </section>
         )}
 
-        {/* Editable text block */}
+        {/* Text editor */}
         {plan && (
           <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-base font-semibold">Editable text</h2>
@@ -404,43 +389,4 @@ export default function HomePage() {
       </div>
     </main>
   );
-}
-
-/* ---------------------------------------------------------
-   Convert plan to readable text
---------------------------------------------------------- */
-function formatPlanForEditor(days: any[]): string {
-  let txt = '';
-
-  for (const day of days) {
-    txt += `DAY ${day.day_number}: ${day.title}\n\n`;
-
-    if (day.goals?.length) {
-      txt += `Goals:\n${day.goals.map((g: string) => `• ${g}`).join('\n')}\n\n`;
-    }
-
-    if (day.theory) {
-      txt += `Theory:\n${day.theory}\n\n`;
-    }
-
-    if (day.practice?.length) {
-      txt += `Practice:\n${day.practice
-        .map((p: string) => `• ${p}`)
-        .join('\n')}\n\n`;
-    }
-
-    if (day.summary) {
-      txt += `Summary:\n${day.summary}\n\n`;
-    }
-
-    if (day.quiz?.length) {
-      txt += `Quiz:\n${day.quiz
-        .map((q: any) => `Q: ${q.q}\nA: ${q.a}\n`)
-        .join('\n')}\n`;
-    }
-
-    txt += `\n\n`;
-  }
-
-  return txt.trim();
 }
