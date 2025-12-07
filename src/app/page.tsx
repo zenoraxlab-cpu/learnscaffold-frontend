@@ -365,7 +365,7 @@ export default function HomePage() {
 
         {plan && (
           <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/30 p-6">
-            <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
+            <StudyPlanViewer analysis={analysis} plan={plan.plan} />
           </section>
         )}
 
