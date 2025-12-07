@@ -1,3 +1,5 @@
+// force rebuild 2025-02-XX
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -234,7 +236,10 @@ export default function HomePage() {
       }
 
       setPlan(generated);
-      setEditableText(JSON.stringify(generated, null, 2));
+
+      // Make the editable text HUMAN-READABLE instead of JSON
+      setEditableText(formatPlanForEditor(generated.plan.days));
+
       setStatus('ready');
     } catch (err) {
       console.error(err);
@@ -243,7 +248,7 @@ export default function HomePage() {
     }
   };
 
-  /* PDF DOWNLOAD */
+  /* PDF */
   const handleDownloadPdf = async () => {
     if (!editableText.trim() || !fileId) return;
 
@@ -276,6 +281,7 @@ export default function HomePage() {
   const showDots = !['ready', 'error', 'idle'].includes(statusKey);
   const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
 
+  /* UI */
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
@@ -283,9 +289,10 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Interface v0.9.0</div>
+          <div className="text-xs text-slate-400">Interface v0.8.3</div>
         </header>
 
+        {/* Upload block */}
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
           <h1 className="text-2xl font-semibold">Upload a textbook or video</h1>
           <p className="mt-2 text-sm text-slate-300">
@@ -313,29 +320,27 @@ export default function HomePage() {
           )}
         </section>
 
+        {/* Analysis block (original design restored) */}
         {analysis && (
           <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
             <h2 className="text-lg font-semibold">Learning plan settings</h2>
 
             <div className="mt-3 text-sm">
-              {analysis?.document_type && (
-                <p>Document type: {analysis.document_type}</p>
-              )}
+              <p>Document type: {analysis.document_type}</p>
+              <p>Language: {analysis.document_language}</p>
 
-              {analysis?.document_language && (
-                <p>Language: {analysis.document_language}</p>
-              )}
-
-              {Array.isArray(analysis?.main_topics) && (
+              {Array.isArray(analysis.main_topics) && (
                 <p>Main topics: {analysis.main_topics.join(', ')}</p>
               )}
 
-              {recommendedDays !== null && (
-                <p>Recommended days: {recommendedDays}</p>
+              {Array.isArray(analysis.source_pages) && (
+                <p>Source pages: {analysis.source_pages.join(', ')}</p>
               )}
+
+              <p>Recommended days: {recommendedDays}</p>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 flex items-center gap-4">
               <label className="text-xs">Days</label>
               <input
                 type="number"
@@ -343,7 +348,7 @@ export default function HomePage() {
                 max={90}
                 value={days}
                 onChange={(e) => setDays(Number(e.target.value))}
-                className="ml-3 rounded bg-slate-900 px-2"
+                className="rounded bg-slate-900 px-2"
               />
             </div>
 
@@ -352,7 +357,7 @@ export default function HomePage() {
               <LanguageSelector
                 value={planLanguage}
                 onChange={setPlanLanguage}
-                original={analysis?.document_language}
+                original={analysis.document_language}
               />
             </div>
 
@@ -372,6 +377,7 @@ export default function HomePage() {
           </section>
         )}
 
+        {/* Editable text block */}
         {plan && (
           <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-base font-semibold">Editable text</h2>
@@ -397,10 +403,40 @@ export default function HomePage() {
 }
 
 /* ---------------------------------------------------------
-   Helper
+   Convert plan to readable text
 --------------------------------------------------------- */
-function planToText(plan: StudyPlanResponse): string {
-  return JSON.stringify(plan, null, 2);
-}
+function formatPlanForEditor(days: any[]): string {
+  let txt = '';
 
-// force rebuild Dec-07-2025
+  for (const day of days) {
+    txt += `DAY ${day.day_number}: ${day.title}\n\n`;
+
+    if (day.goals?.length) {
+      txt += `Goals:\n${day.goals.map((g: string) => `• ${g}`).join('\n')}\n\n`;
+    }
+
+    if (day.theory) {
+      txt += `Theory:\n${day.theory}\n\n`;
+    }
+
+    if (day.practice?.length) {
+      txt += `Practice:\n${day.practice
+        .map((p: string) => `• ${p}`)
+        .join('\n')}\n\n`;
+    }
+
+    if (day.summary) {
+      txt += `Summary:\n${day.summary}\n\n`;
+    }
+
+    if (day.quiz?.length) {
+      txt += `Quiz:\n${day.quiz
+        .map((q: any) => `Q: ${q.q}\nA: ${q.a}\n`)
+        .join('\n')}\n`;
+    }
+
+    txt += `\n\n`;
+  }
+
+  return txt.trim();
+}
