@@ -1,6 +1,3 @@
-// force-rebuild-2025-12-05-01
-// cache-bust-2025-12-05
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -18,11 +15,7 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-import type {
-  StudyPlanResponse,
-  AnalysisBlock,
-  PlanBlock,
-} from '@/types/studyplan';
+import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -77,7 +70,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
 
-  const [analysis, setAnalysis] = useState<AnalysisBlock | null>(null);
+  const [analysis, setAnalysis] = useState<any | null>(null);
   const [recommendedDays, setRecommendedDays] = useState<number | null>(null);
   const [days, setDays] = useState<number>(7);
 
@@ -94,33 +87,21 @@ export default function HomePage() {
   const isBusy =
     status === 'uploading' || status === 'analyzing' || status === 'generating';
 
-  /* ---------------------------------------------------------
-     GENERATION TIMER (FIXED CLEANUP)
-  --------------------------------------------------------- */
-
+  /* TIMER */
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer: any = null;
 
     if (status === 'generating') {
       setElapsedSeconds(0);
-      timer = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
+      timer = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
     } else {
       setElapsedSeconds(0);
     }
 
-    return () => {
-      if (timer !== null) {
-        clearInterval(timer);
-      }
-    };
+    return () => timer && clearInterval(timer);
   }, [status]);
 
-  /* ---------------------------------------------------------
-     POLLING BACKEND STATUS (FIXED CLEANUP)
-  --------------------------------------------------------- */
-
+  /* POLLING */
   useEffect(() => {
     if (!fileId || status !== 'analyzing') return;
 
@@ -130,7 +111,6 @@ export default function HomePage() {
       : 2000;
 
     let cancelled = false;
-
     const interval = setInterval(async () => {
       if (cancelled) return;
 
@@ -140,10 +120,9 @@ export default function HomePage() {
         if (st?.status) {
           setAnalysisStatus(st.status);
 
-          if (STATUS_PROGRESS_MAP[st.status] !== undefined) {
-            setAnalysisProgress((prev) =>
-              Math.max(prev, STATUS_PROGRESS_MAP[st.status]),
-            );
+          const mapped = STATUS_PROGRESS_MAP[st.status];
+          if (mapped !== undefined) {
+            setAnalysisProgress((prev) => Math.max(prev, mapped));
           }
         }
 
@@ -156,9 +135,7 @@ export default function HomePage() {
           clearInterval(interval);
           setStatus('error');
         }
-      } catch (e) {
-        console.error('Polling error', e);
-      }
+      } catch {}
     }, pollInterval);
 
     return () => {
@@ -167,22 +144,16 @@ export default function HomePage() {
     };
   }, [fileId, status, analysisStatus]);
 
-  /* ---------------------------------------------------------
-     SOFT PROGRESS BAR (FIXED CLEANUP)
-  --------------------------------------------------------- */
-
+  /* SMOOTH PROGRESS BAR */
   useEffect(() => {
     if (status !== 'analyzing') return;
 
-    setAnalysisProgress((prev) => (prev < 5 ? 5 : prev));
+    setAnalysisProgress((p) => (p < 5 ? 5 : p));
 
     const timer = setInterval(() => {
       setAnalysisProgress((prev) => {
         const key = analysisStatus;
-        const target =
-          key && STATUS_PROGRESS_MAP[key] !== undefined
-            ? STATUS_PROGRESS_MAP[key]
-            : prev;
+        const target = STATUS_PROGRESS_MAP[key || ''] ?? prev;
 
         if (target > prev) return target;
         if (!key || target < 85) return Math.min(prev + 2, 85);
@@ -191,19 +162,13 @@ export default function HomePage() {
       });
     }, 700);
 
-    return () => {
-      clearInterval(timer);
-    };
+    return () => clearInterval(timer);
   }, [status, analysisStatus]);
 
-  /* ---------------------------------------------------------
-     FILE UPLOAD & ANALYSIS
-  --------------------------------------------------------- */
-
+  /* FILE UPLOAD + ANALYSIS */
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
 
-    // Clear previous state
     setError(null);
     setPlan(null);
     setAnalysis(null);
@@ -232,15 +197,19 @@ export default function HomePage() {
 
         const res = await analyze(uploadRes.file_id);
 
-        if (!res?.analysis || !res.analysis.document_type) {
+        /** BACKEND NOW RETURNS analysis DIRECTLY */
+        const analysisBlock = res.analysis ?? res; // fallback if backend sends flat structure
+
+        if (!analysisBlock.document_type) {
+          console.error('Bad analysis:', res);
           throw new Error('Malformed analysis data');
         }
 
-        setAnalysis(res.analysis);
+        setAnalysis(analysisBlock);
 
         const rec =
-          res.analysis.recommended_days && res.analysis.recommended_days > 0
-            ? res.analysis.recommended_days
+          analysisBlock.recommended_days && analysisBlock.recommended_days > 0
+            ? analysisBlock.recommended_days
             : 7;
 
         setRecommendedDays(rec);
@@ -255,10 +224,7 @@ export default function HomePage() {
     })();
   };
 
-  /* ---------------------------------------------------------
-     GENERATE PLAN — FIXED (VALIDATION + NO CRASH)
-  --------------------------------------------------------- */
-
+  /* GENERATE PLAN */
   const handleGenerate = async () => {
     if (!fileId) return;
 
@@ -268,11 +234,7 @@ export default function HomePage() {
 
       const generated = await generatePlan(fileId, days, planLanguage);
 
-      if (
-        !generated ||
-        !generated.plan ||
-        !Array.isArray(generated.plan.days)
-      ) {
+      if (!generated.plan || !Array.isArray(generated.plan.days)) {
         console.error('Invalid plan structure:', generated);
         setStatus('error');
         return;
@@ -280,7 +242,6 @@ export default function HomePage() {
 
       setPlan(generated);
       setEditableText(planToText(generated));
-
       setStatus('ready');
     } catch (err) {
       console.error(err);
@@ -289,10 +250,7 @@ export default function HomePage() {
     }
   };
 
-  /* ---------------------------------------------------------
-     PDF DOWNLOAD
-  --------------------------------------------------------- */
-
+  /* PDF */
   const handleDownloadPdf = async () => {
     if (!editableText.trim() || !fileId) return;
 
@@ -318,20 +276,14 @@ export default function HomePage() {
     }
   };
 
-  /* ---------------------------------------------------------
-     UI LABELS
-  --------------------------------------------------------- */
-
+  /* UI LABELS */
   const dots = useDots();
   const statusKey = analysisStatus || status || 'idle';
   const baseLabel = STATUS_LABELS[statusKey] || statusKey;
   const showDots = !['ready', 'error', 'idle'].includes(statusKey);
   const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
 
-  /* ---------------------------------------------------------
-     UI COMPOSITION
-  --------------------------------------------------------- */
-
+  /* UI */
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
@@ -339,485 +291,112 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Test interface · v0.8.1</div>
+          <div className="text-xs text-slate-400">Interface v0.8.2</div>
         </header>
 
-        <Stepper selectedFile={selectedFile} analysis={analysis} plan={plan} />
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+          <h1 className="text-2xl font-semibold">Upload a textbook or video</h1>
+          <p className="mt-2 text-sm text-slate-300">
+            After upload, the file will be automatically analyzed.
+          </p>
 
-        <UploadSection
-          status={status}
-          analysisStatus={analysisStatus}
-          analysisProgress={analysisProgress}
-          error={error}
-          fileId={fileId}
-          isBusy={isBusy}
-          handleFileSelected={handleFileSelected}
-          uiLabel={uiLabel}
-        />
+          <div className="mt-6">
+            <FileDropzone
+              onFileSelected={isBusy ? undefined : handleFileSelected}
+            />
+          </div>
+
+          {(status === 'uploading' || status === 'analyzing') && (
+            <div className="mt-4">
+              <ProgressBar progress={analysisProgress} status={uiLabel} />
+            </div>
+          )}
+
+          {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
+
+          {fileId && (
+            <p className="mt-2 text-[11px] text-slate-500">
+              File ID: <span className="font-mono">{fileId}</span>
+            </p>
+          )}
+        </section>
 
         {analysis && (
-          <AnalysisSection
-            analysis={analysis}
-            recommendedDays={recommendedDays}
-            setDays={setDays}
-            days={days}
-            planLanguage={planLanguage}
-            setPlanLanguage={setPlanLanguage}
-            status={status}
-            fileId={fileId}
-            isBusy={isBusy}
-            onGenerate={handleGenerate}
-            generationProgress={Math.min(
-              0.95,
-              elapsedSeconds / Math.max(20, days * 5),
-            )}
-            remainingSeconds={Math.max(
-              0,
-              Math.round(Math.max(20, days * 5) - elapsedSeconds),
-            )}
-          />
+          <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
+            <h2 className="text-lg font-semibold">Learning plan settings</h2>
+
+            <div className="mt-3 text-sm">
+              <p>Document type: {analysis.document_type}</p>
+              <p>Language: {analysis.document_language}</p>
+              <p>Main topics: {(analysis.main_topics || []).join(', ')}</p>
+              <p>Recommended days: {recommendedDays}</p>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-xs">Days</label>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+                className="ml-3 rounded bg-slate-900 px-2"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="text-xs">Plan language</label>
+              <LanguageSelector
+                value={planLanguage}
+                onChange={setPlanLanguage}
+                original={analysis.document_language}
+              />
+            </div>
+
+            <button
+              onClick={handleGenerate}
+              disabled={isBusy || !fileId}
+              className="mt-4 rounded bg-emerald-500 px-4 py-2 text-black"
+            >
+              {status === 'generating' ? 'Generating…' : 'Generate plan'}
+            </button>
+          </section>
         )}
 
-        {plan && plan.plan && Array.isArray(plan.plan.days) && (
-          <FinalPlanSection
-            plan={plan}
-            editableText={editableText}
-            setEditableText={setEditableText}
-            isBusy={isBusy}
-            isDownloading={isDownloading}
-            onDownload={handleDownloadPdf}
-            fileId={fileId}
-          />
+        {plan && (
+          <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/30 p-6">
+            <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
+          </section>
         )}
 
-        <footer className="mt-auto pt-8 text-xs text-slate-500">
-          © {new Date().getFullYear()} LearnScaffold. Internal prototype.
-        </footer>
+        {plan && (
+          <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
+            <h2 className="text-base font-semibold">Editable text</h2>
+
+            <textarea
+              className="mt-3 h-80 w-full rounded-2xl bg-white p-4 text-black"
+              value={editableText}
+              onChange={(e) => setEditableText(e.target.value)}
+            />
+
+            <button
+              onClick={handleDownloadPdf}
+              disabled={!editableText.trim() || isDownloading}
+              className="mt-3 rounded bg-emerald-500 px-4 py-2 text-black"
+            >
+              {isDownloading ? 'Generating PDF…' : 'Download PDF'}
+            </button>
+          </section>
+        )}
       </div>
     </main>
   );
 }
 
 /* ---------------------------------------------------------
-   SUPPORTING UI COMPONENTS  
+   Helper
 --------------------------------------------------------- */
-
-interface StepperProps {
-  selectedFile: File | null;
-  analysis: AnalysisBlock | null;
-  plan: StudyPlanResponse | null;
-}
-
-function Stepper({ selectedFile, analysis, plan }: StepperProps) {
-  return (
-    <div className="mb-6 flex items-center gap-3 text-xs text-slate-300">
-      <StepBadge active number={1} label="Upload file" />
-      <StepLine active={!!selectedFile} />
-      <StepBadge active={!!analysis} number={2} label="Analysis & settings" />
-      <StepLine active={!!plan} />
-      <StepBadge active={!!plan} number={3} label="Learning plan" />
-    </div>
-  );
-}
-
-interface UploadSectionProps {
-  status: string;
-  analysisStatus: string | null;
-  analysisProgress: number;
-  error: string | null;
-  fileId: string | null;
-  isBusy: boolean;
-  handleFileSelected: (file: File) => void;
-  uiLabel: string;
-}
-
-function UploadSection({
-  status,
-  analysisStatus,
-  analysisProgress,
-  error,
-  fileId,
-  isBusy,
-  handleFileSelected,
-  uiLabel,
-}: UploadSectionProps) {
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Upload a textbook or video
-      </h1>
-      <p className="mt-2 text-sm text-slate-300">
-        After upload, the file will be automatically analyzed.
-      </p>
-
-      <div className="mt-6">
-        <FileDropzone
-          onFileSelected={isBusy ? undefined : handleFileSelected}
-        />
-      </div>
-
-      {(status === 'uploading' || status === 'analyzing') && (
-        <div className="mt-4">
-          <ProgressBar progress={analysisProgress} status={uiLabel} />
-        </div>
-      )}
-
-      {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
-
-      {fileId && (
-        <p className="mt-2 text-[11px] text-slate-500">
-          File ID: <span className="font-mono">{fileId}</span>
-        </p>
-      )}
-    </section>
-  );
-}
-
-interface AnalysisSectionProps {
-  analysis: AnalysisBlock;
-  recommendedDays: number | null;
-  setDays: (value: number) => void;
-  days: number;
-  planLanguage: string;
-  setPlanLanguage: (lang: string) => void;
-  status: string;
-  fileId: string | null;
-  isBusy: boolean;
-  onGenerate: () => void;
-  generationProgress: number;
-  remainingSeconds: number;
-}
-
-function AnalysisSection({
-  analysis,
-  recommendedDays,
-  setDays,
-  days,
-  planLanguage,
-  setPlanLanguage,
-  status,
-  fileId,
-  isBusy,
-  onGenerate,
-  generationProgress,
-  remainingSeconds,
-}: AnalysisSectionProps) {
-  const dots = useDots();
-
-  return (
-    <section className="mt-6 rounded-3xl border border-sky-500/30 bg-sky-950/30 p-6">
-      <p className="text-xs uppercase tracking-wide text-sky-300/80">
-        Document analysis
-      </p>
-      <h2 className="mt-1 text-lg font-semibold">Learning plan settings</h2>
-
-      <div className="mt-3 grid gap-4 text-sm text-slate-100 md:grid-cols-2">
-        <div>
-          <LabelBlock title="Document type">
-            {analysis.document_type}
-          </LabelBlock>
-          <LabelBlock title="Level">{analysis.level}</LabelBlock>
-
-          {analysis.main_topics?.length > 0 && (
-            <LabelBlock title="Main topics">
-              {analysis.main_topics.join(', ')}
-            </LabelBlock>
-          )}
-        </div>
-
-        <div>
-          <LabelBlock title="Recommended number of days">
-            {recommendedDays
-              ? `${recommendedDays} days (model estimate)`
-              : 'no estimate — using default'}
-          </LabelBlock>
-
-          <div className="mt-4 text-[11px] uppercase tracking-wide text-sky-300/80">
-            Lessons count
-          </div>
-
-          <div className="mt-1 flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={90}
-              value={days}
-              onChange={(e) =>
-                setDays(Math.max(1, Math.min(90, Number(e.target.value) || 1)))
-              }
-              className="w-20 rounded-full border border-sky-400 bg-slate-950 px-3 py-1 text-sm text-slate-50 outline-none focus:border-emerald-400"
-            />
-            <span className="text-xs text-slate-300">days</span>
-          </div>
-
-          <div className="mt-6">
-            <LabelBlock title="Plan language" />
-            <LanguageSelector
-              value={planLanguage}
-              onChange={(lang) => setPlanLanguage(lang)}
-              original={analysis?.document_language || 'auto'}
-            />
-          </div>
-
-          {status === 'generating' && (
-            <div className="mt-4">
-              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Generating learning plan{dots}</span>
-                <span>
-                  {remainingSeconds > 0
-                    ? `${remainingSeconds}s left`
-                    : 'finalizing…'}
-                </span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-emerald-400 transition-all duration-300"
-                  style={{ width: `${Math.round(generationProgress * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {analysis.summary && (
-        <LabelBlock title="Short description" className="mt-4">
-          {analysis.summary}
-        </LabelBlock>
-      )}
-
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={!fileId || isBusy}
-          className={[
-            'rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-wide',
-            !fileId || isBusy
-              ? 'cursor-not-allowed border border-slate-600 bg-slate-800 text-slate-500'
-              : 'border border-emerald-400 bg-emerald-500 text-slate-950 hover:bg-emerald-400',
-          ].join(' ')}
-        >
-          {status === 'generating'
-            ? `Generating${dots}`
-            : 'Generate learning plan'}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-interface FinalPlanSectionProps {
-  plan: StudyPlanResponse;
-  editableText: string;
-  setEditableText: (text: string) => void;
-  isBusy: boolean;
-  isDownloading: boolean;
-  onDownload: () => void;
-  fileId: string | null;
-}
-
-function FinalPlanSection({
-  plan,
-  editableText,
-  setEditableText,
-  isBusy,
-  isDownloading,
-  onDownload,
-  fileId,
-}: FinalPlanSectionProps) {
-  return (
-    <>
-      <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/40 p-6">
-        <p className="text-xs uppercase tracking-wide text-emerald-300/80">
-          Final plan
-        </p>
-
-        <h2 className="mt-1 text-lg font-semibold">Day-by-day structure</h2>
-
-        <div className="mt-4 rounded-2xl bg-black/20 p-4">
-          <StudyPlanViewer analysis={plan.analysis} plan={plan.plan} />
-        </div>
-      </section>
-
-      <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-        <h2 className="text-base font-semibold">Editable learning plan text</h2>
-
-        <textarea
-          className="mt-3 h-80 w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm leading-relaxed text-slate-900 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-          value={editableText}
-          onChange={(e) => setEditableText(e.target.value)}
-        />
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onDownload}
-            disabled={
-              !editableText.trim() || !fileId || isBusy || isDownloading
-            }
-            className={[
-              'rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-wide',
-              !editableText.trim() || !fileId || isBusy || isDownloading
-                ? 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500'
-                : 'border-emerald-500 bg-emerald-500 text-slate-950 hover:bg-emerald-400',
-            ].join(' ')}
-          >
-            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
-          </button>
-
-          <p className="text-[11px] text-slate-500">
-            PDF is generated from this text (including your edits)
-          </p>
-        </div>
-      </section>
-    </>
-  );
-}
-
-/* ---------------------------------------------------------
-   COMMON UI BLOCKS
---------------------------------------------------------- */
-
-interface LabelBlockProps {
-  title: string;
-  children?: React.ReactNode;
-  className?: string;
-}
-
-function LabelBlock({ title, children, className = '' }: LabelBlockProps) {
-  return (
-    <div className={className}>
-      <div className="text-[11px] uppercase tracking-wide text-sky-300/80">
-        {title}
-      </div>
-      <div className="mt-1 text-sm">{children}</div>
-    </div>
-  );
-}
-
-interface StepBadgeProps {
-  active: boolean;
-  number: number;
-  label: string;
-}
-
-function StepBadge({ active, number, label }: StepBadgeProps) {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className={[
-          'flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-semibold',
-          active
-            ? 'border-emerald-400 bg-emerald-500 text-slate-950'
-            : 'border-slate-600 bg-slate-900 text-slate-400',
-        ].join(' ')}
-      >
-        {number}
-      </div>
-      <span
-        className={active ? 'text-xs text-slate-100' : 'text-xs text-slate-500'}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
-
-interface StepLineProps {
-  active: boolean;
-}
-
-function StepLine({ active }: StepLineProps) {
-  return (
-    <div
-      className={
-        'h-px flex-1 rounded-full ' +
-        (active ? 'bg-emerald-400/80' : 'bg-slate-700')
-      }
-    />
-  );
-}
-
-/* ---------------------------------------------------------
-   PLAN → TEXT (FIXED practice line)
---------------------------------------------------------- */
-
-function formatPagesForText(pages?: number[]): string | null {
-  if (!pages || pages.length === 0) return null;
-
-  const minPage = Math.min(...pages);
-  const maxPage = Math.max(...pages);
-
-  if (minPage === maxPage) return `p. ${minPage}`;
-  return `pp. ${minPage}–${maxPage}`;
-}
 
 function planToText(plan: StudyPlanResponse): string {
-  const lines: string[] = [];
-
-  lines.push(`Learning plan · ${plan.days} days`);
-  lines.push(`File ID: ${plan.file_id}`);
-  lines.push('');
-
-  lines.push(
-    `Document type: ${plan.analysis.document_type}, level: ${plan.analysis.level}`,
-  );
-
-  if (plan.analysis.main_topics?.length) {
-    lines.push(`Main topics: ${plan.analysis.main_topics.join(', ')}`);
-  }
-
-  if (plan.analysis.summary) {
-    lines.push('');
-    lines.push(plan.analysis.summary);
-  }
-
-  lines.push('');
-
-  for (const day of plan.plan.days) {
-    lines.push(`Day ${day.day_number}. ${day.title}`);
-
-    const pagesLabel = formatPagesForText(day.source_pages);
-    if (pagesLabel) lines.push(`Pages: ${pagesLabel}`);
-    lines.push('');
-
-    if (day.goals?.length) {
-      lines.push('Goals');
-      day.goals.forEach((g) => lines.push(`- ${g}`));
-      lines.push('');
-    }
-
-    if (day.theory) {
-      lines.push('Theory');
-      lines.push(day.theory);
-      lines.push('');
-    }
-
-    if (day.practice?.length) {
-      lines.push('Practice');
-      day.practice.forEach((p) => lines.push(`- ${p}`)); // FIXED
-      lines.push('');
-    }
-
-    if (day.summary) {
-      lines.push('Daily summary');
-      lines.push(day.summary);
-      lines.push('');
-    }
-
-    if (day.quiz?.length) {
-      lines.push('Review questions');
-      day.quiz.forEach((q) => {
-        lines.push(`Question: ${q.q}`);
-        lines.push(`Answer: ${q.a}`);
-        lines.push('');
-      });
-    }
-
-    lines.push('---');
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return JSON.stringify(plan, null, 2);
 }

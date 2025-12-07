@@ -1,6 +1,6 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://learnscaffold-backend.onrender.com';
+  'https://learnscaffold-backend-ocr.onrender.com';
 
 /* ---------------------------------------------------------
    UPLOAD FILE
@@ -25,7 +25,7 @@ export async function uploadStudyFile(file: File) {
    START ANALYSIS
 --------------------------------------------------------- */
 export async function analyze(fileId: string) {
-  const res = await fetch(`${API_URL}/analyze/`, {
+  const res = await fetch(`${API_URL}/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file_id: fileId }),
