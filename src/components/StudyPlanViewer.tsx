@@ -59,9 +59,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
               {analysis.document_language
                 ? ` · ${analysis.document_language}`
                 : ''}
-              {analysis.recommended_days
-                ? ` · ${analysis.recommended_days} days`
-                : ''}
+              {plan.days?.length ? ` · ${plan.days.length} days` : ''}
             </p>
           )}
         </div>
