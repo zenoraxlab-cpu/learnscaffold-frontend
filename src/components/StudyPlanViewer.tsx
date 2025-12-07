@@ -2,6 +2,24 @@
 
 import React from 'react';
 
+function formatPages(pages: number[]) {
+  if (!pages || pages.length === 0) return '';
+
+  if (pages.length === 1) return `Page ${pages[0]}`;
+
+  const sorted = [...pages].sort((a, b) => a - b);
+
+  const isRange = sorted.every((p, i) =>
+    i === 0 ? true : p === sorted[i - 1] + 1,
+  );
+
+  if (isRange) {
+    return `Pages ${sorted[0]}–${sorted[sorted.length - 1]}`;
+  }
+
+  return `Pages ${sorted.join(', ')}`;
+}
+
 export interface PlanDay {
   day_number: number;
   title: string;
@@ -69,9 +87,7 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
               {Array.isArray(day.source_pages) &&
                 day.source_pages.length > 0 && (
                   <span className="text-[11px] text-slate-400 whitespace-nowrap">
-                    {day.source_pages.length === 1
-                      ? `Page ${day.source_pages[0]}`
-                      : `Pages ${day.source_pages.join(', ')}`}
+                    {formatPages(day.source_pages)}
                   </span>
                 )}
             </header>
