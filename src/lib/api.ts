@@ -55,7 +55,7 @@ export async function getAnalysisStatus(fileId: string, language: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE PLAN (fixed)
+   GENERATE PLAN — корректная версия
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -81,28 +81,37 @@ export async function generatePlan(
 
   console.log('RAW PLAN RESPONSE:', JSON.stringify(json, null, 2));
 
-  // backend must return plan
-  if (!json.plan) {
-    console.error("Missing 'plan' in backend response:", json);
-    throw new Error('Backend did not return a learning plan');
-  }
+  /* ---------------------------------------------------------
+     1. НЕ проверяем json.analysis — его НЕТ в этом endpoint
+     (analysis приходит только из /analyze)
+  --------------------------------------------------------- */
 
-  // normalize plan
+  /* ---------------------------------------------------------
+     2. Нормализация структуры плана
+  --------------------------------------------------------- */
   let normalizedDays: any[] = [];
 
+  // Вариант: plan: [...]
   if (Array.isArray(json.plan)) {
     normalizedDays = json.plan;
-  } else if (json.plan && Array.isArray(json.plan.days)) {
+  }
+
+  // Вариант: plan: { days: [...] }
+  else if (json.plan && Array.isArray(json.plan.days)) {
     normalizedDays = json.plan.days;
-  } else if (json.plan && typeof json.plan === 'object') {
-    const values = Object.values(json.plan);
-    if (values.length > 0) normalizedDays = values;
+  }
+
+  // Вариант: plan: {0:{},1:{}} → превращаем в массив
+  else if (json.plan && typeof json.plan === 'object') {
+    normalizedDays = Object.values(json.plan);
   }
 
   if (!Array.isArray(normalizedDays)) {
-    throw new Error('Invalid plan structure: cannot extract days array');
+    console.error('Invalid plan format:', json);
+    throw new Error('Plan format invalid: cannot extract days array');
   }
 
+  // Итоговая структура, которую ожидает фронтенд
   json.plan = { days: normalizedDays };
 
   return json;
