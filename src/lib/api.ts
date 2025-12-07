@@ -40,7 +40,7 @@ export async function analyze(fileId: string) {
 }
 
 /* ---------------------------------------------------------
-   GET ANALYSIS STATUS
+   GET STATUS
 --------------------------------------------------------- */
 export async function getAnalysisStatus(fileId: string, language: string) {
   const res = await fetch(
@@ -55,7 +55,7 @@ export async function getAnalysisStatus(fileId: string, language: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE LEARNING PLAN (AUTO-NORMALIZATION FIX)
+   GENERATE PLAN (fixed)
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -77,56 +77,32 @@ export async function generatePlan(
     throw new Error(`Generate failed (${res.status}): ${txt}`);
   }
 
-  let json: any;
-
-  try {
-    json = await res.json();
-  } catch (e) {
-    console.error('JSON parse error:', e);
-    throw new Error('Invalid JSON from backend');
-  }
+  const json: any = await res.json();
 
   console.log('RAW PLAN RESPONSE:', JSON.stringify(json, null, 2));
 
-  /* ---------------------------------------------------------
-     ANALYSIS VALIDATION
-  --------------------------------------------------------- */
-  if (!json.analysis || typeof json.analysis !== 'object') {
-    console.error('Bad analysis:', json);
-    throw new Error('Invalid analysis block');
+  // backend must return plan
+  if (!json.plan) {
+    console.error("Missing 'plan' in backend response:", json);
+    throw new Error('Backend did not return a learning plan');
   }
 
-  /* ---------------------------------------------------------
-     PLAN STRUCTURE NORMALIZATION
-     Backend might return:
-        plan: {0:{},1:{}} → we convert to array
-        plan: [...] → ok
-        plan: {days:[...]} → ok
-  --------------------------------------------------------- */
-
+  // normalize plan
   let normalizedDays: any[] = [];
 
   if (Array.isArray(json.plan)) {
-    // plan is array itself
     normalizedDays = json.plan;
   } else if (json.plan && Array.isArray(json.plan.days)) {
-    // correct format
     normalizedDays = json.plan.days;
   } else if (json.plan && typeof json.plan === 'object') {
-    // convert "object of objects" → array
     const values = Object.values(json.plan);
-    if (values.length > 0 && typeof values[0] === 'object') {
-      normalizedDays = values;
-    }
+    if (values.length > 0) normalizedDays = values;
   }
 
-  // FINAL CHECK
   if (!Array.isArray(normalizedDays)) {
-    console.error('Invalid plan.days structure:', json.plan);
     throw new Error('Invalid plan structure: cannot extract days array');
   }
 
-  // APPLY NORMALIZED STRUCTURE
   json.plan = { days: normalizedDays };
 
   return json;
