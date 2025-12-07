@@ -516,5 +516,42 @@ export default function HomePage() {
    Helper
 --------------------------------------------------------- */
 function planToText(plan: StudyPlanResponse): string {
-  return JSON.stringify(plan, null, 2);
+  if (!plan?.plan?.days) return '';
+
+  const out: string[] = [];
+
+  for (const day of plan.plan.days) {
+    out.push(`Day ${day.day_number} — ${day.title}`);
+
+    if (day.goals?.length) {
+      out.push(`\nGOALS:`);
+      for (const g of day.goals) out.push(`• ${g}`);
+    }
+
+    if (day.theory) {
+      out.push(`\nTHEORY:\n${day.theory}`);
+    }
+
+    if (day.practice?.length) {
+      out.push(`\nPRACTICE:`);
+      for (const p of day.practice) out.push(`• ${p}`);
+    }
+
+    if (day.summary) {
+      out.push(`\nSUMMARY:\n${day.summary}`);
+    }
+
+    if (day.quiz?.length) {
+      out.push(`\nQUIZ:`);
+      for (const qa of day.quiz) {
+        out.push(`Q: ${qa.q}`);
+        out.push(`A: ${qa.a}`);
+        out.push('');
+      }
+    }
+
+    out.push(`----------------------------------------\n`);
+  }
+
+  return out.join('\n');
 }
