@@ -15,7 +15,7 @@ import {
 
 import StudyPlanViewer from '@/components/StudyPlanViewer';
 import ProgressBar from '@/components/ProgressBar';
-import type { StudyPlanResponse, AnalysisBlock } from '@/types/studyplan';
+import type { StudyPlanResponse } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
    BACKEND STATUS → PROGRESS MAP
@@ -62,7 +62,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function HomePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
   const [status, setStatus] = useState<
     'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error'
   >('idle');
@@ -197,22 +196,19 @@ export default function HomePage() {
 
         const res = await analyze(uploadRes.file_id);
 
-        // BACKEND NOW RETURNS analysis DIRECTLY
+        // Backend may return res.analysis OR full object
         const analysisBlock = res.analysis ?? res;
 
-        if (analysisBlock?.document_type) {
-          setAnalysis(analysisBlock);
+        // Assign raw analysis without validation
+        setAnalysis(analysisBlock);
 
-          const rec =
-            analysisBlock.recommended_days && analysisBlock.recommended_days > 0
-              ? analysisBlock.recommended_days
-              : 7;
+        const rec =
+          analysisBlock?.recommended_days && analysisBlock.recommended_days > 0
+            ? analysisBlock.recommended_days
+            : 7;
 
-          setRecommendedDays(rec);
-          setDays(rec);
-        } else {
-          console.warn('No analysis block received');
-        }
+        setRecommendedDays(rec);
+        setDays(rec);
 
         setStatus('idle');
       } catch (err) {
@@ -290,7 +286,7 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             LearnScaffold <span className="text-xs text-slate-400">MVP</span>
           </div>
-          <div className="text-xs text-slate-400">Interface v0.8.2</div>
+          <div className="text-xs text-slate-400">Interface v0.8.3</div>
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
@@ -395,7 +391,6 @@ export default function HomePage() {
 /* ---------------------------------------------------------
    Helper
 --------------------------------------------------------- */
-
 function planToText(plan: StudyPlanResponse): string {
   return JSON.stringify(plan, null, 2);
 }
