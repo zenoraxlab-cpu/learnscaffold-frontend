@@ -3,7 +3,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useDots } from '@/hooks/useDots';
 import FileDropzone from '@/components/FileDropzone';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -274,12 +273,9 @@ export default function HomePage() {
     }
   };
 
-  /* UI LABELS */
-  const dots = useDots();
+  /* UI LABELS — без анимации */
   const statusKey = analysisStatus || status || 'idle';
-  const baseLabel = STATUS_LABELS[statusKey] || statusKey;
-  const showDots = !['ready', 'error', 'idle'].includes(statusKey);
-  const uiLabel = showDots ? `${baseLabel}${dots}` : baseLabel;
+  const uiLabel = STATUS_LABELS[statusKey] || statusKey;
 
   /* UI */
   return (
