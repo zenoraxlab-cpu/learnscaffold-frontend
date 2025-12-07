@@ -396,3 +396,4 @@ export default function HomePage() {
 function planToText(plan: StudyPlanResponse): string {
   return JSON.stringify(plan, null, 2);
 }
+// force rebuild Sun Dec  7 18:42:32 +07 2025
