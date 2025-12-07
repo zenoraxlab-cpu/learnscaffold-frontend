@@ -12,17 +12,23 @@ export default function ProgressBar({
   const dots = useDots();
   const pct = Math.min(100, Math.max(0, progress));
 
-  // Добавляем точки только если статус содержит слово "Extract"
-  const animatedStatus =
-    status && (status.includes('Extract') || status.includes('Analyz'))
-      ? `${status}${dots}`
-      : status;
+  // анимация точек только для extract/analyze
+  const showDots =
+    status && (status.includes('Extract') || status.includes('Analyz'));
 
   return (
     <div className="w-full">
-      {animatedStatus && (
-        <div className="mb-1 text-[11px] text-slate-400">
-          {animatedStatus} {pct > 0 ? `· ${pct}%` : ''}
+      {status && (
+        <div className="mb-1 text-[11px] text-slate-400 flex items-center gap-1">
+          <span className="inline-block w-[180px] text-left truncate">
+            {status}
+          </span>
+
+          {showDots && (
+            <span className="inline-block w-[16px] text-left">{dots}</span>
+          )}
+
+          {pct > 0 && <span className="opacity-70">· {pct}%</span>}
         </div>
       )}
 

@@ -66,14 +66,14 @@ export default function StudyPlanViewer({ plan, analysis }: Props) {
                 </h4>
               </div>
 
-              {day.source_pages && day.source_pages.length > 0 && (
-                <span className="text-[11px] text-slate-400">
-                  Pages:{' '}
-                  {day.source_pages.length === 1
-                    ? day.source_pages[0]
-                    : day.source_pages.join(', ')}
-                </span>
-              )}
+              {Array.isArray(day.source_pages) &&
+                day.source_pages.length > 0 && (
+                  <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                    {day.source_pages.length === 1
+                      ? `Page ${day.source_pages[0]}`
+                      : `Pages ${day.source_pages.join(', ')}`}
+                  </span>
+                )}
             </header>
 
             {/* Goals */}
