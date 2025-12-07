@@ -197,32 +197,28 @@ export default function HomePage() {
 
         const res = await analyze(uploadRes.file_id);
 
+        
         /** BACKEND NOW RETURNS analysis DIRECTLY */
-        const analysisBlock = res.analysis ?? res; // fallback if backend sends flat structure
+const analysisBlock = res.analysis ?? res;
 
-        if (!analysisBlock.document_type) {
-          console.error('Bad analysis:', res);
-          throw new Error('Malformed analysis data');
-        }
+// Проверяем только если это действительно analysis
+if (!analysisBlock?.document_type) {
+  console.warn("No document_type in analysis block — skipping validation");
+} else {
+  setAnalysis(analysisBlock);
 
-        setAnalysis(analysisBlock);
+  const rec =
+    analysisBlock.recommended_days && analysisBlock.recommended_days > 0
+      ? analysisBlock.recommended_days
+      : 7;
 
-        const rec =
-          analysisBlock.recommended_days && analysisBlock.recommended_days > 0
-            ? analysisBlock.recommended_days
-            : 7;
+  setRecommendedDays(rec);
+  setDays(rec);
+}
 
-        setRecommendedDays(rec);
-        setDays(rec);
+setStatus('idle');
 
-        setStatus('idle');
-      } catch (err) {
-        console.error(err);
-        setError('Error during analysis');
-        setStatus('error');
-      }
-    })();
-  };
+
 
   /* GENERATE PLAN */
   const handleGenerate = async () => {
