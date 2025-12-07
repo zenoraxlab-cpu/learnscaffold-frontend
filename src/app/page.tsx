@@ -198,10 +198,10 @@ export default function HomePage() {
         const res = await analyze(uploadRes.file_id);
 
         
-        /** BACKEND NOW RETURNS analysis DIRECTLY */
+
+/** BACKEND NOW RETURNS analysis DIRECTLY */
 const analysisBlock = res.analysis ?? res;
 
-// Проверяем только если это действительно analysis
 if (!analysisBlock?.document_type) {
   console.warn("No document_type in analysis block — skipping validation");
 } else {
@@ -217,7 +217,12 @@ if (!analysisBlock?.document_type) {
 }
 
 setStatus('idle');
-
+})().catch((err) => {
+  console.error(err);
+  setError('Error during analysis');
+  setStatus('error');
+});
+}; // ←←← ЗАКРЫВАЕМ handleFileSelected ПРАВИЛЬНО!
 
 
   /* GENERATE PLAN */
