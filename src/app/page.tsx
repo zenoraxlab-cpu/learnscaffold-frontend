@@ -27,18 +27,21 @@ const USER_FRIENDLY_ERROR =
 /* ---------------------------------------------------------
    UNIVERSAL ERROR POPUP (toast)
 --------------------------------------------------------- */
-const ErrorPopup = ({ message, onClose }) => {
+const ErrorPopup: React.FC<{ message: string | null; onClose: () => void }> = ({
+  message,
+  onClose,
+}) => {
   if (!message) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50">
-      <div className="bg-red-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-start gap-3 max-w-xs text-sm">
+    <div className="fixed top-4 right-4 z-50 rounded-xl bg-red-600/90 px-4 py-3 text-sm shadow-lg">
+      <div className="flex items-center justify-between gap-4">
         <span>{message}</span>
         <button
           onClick={onClose}
-          className="ml-auto text-white font-bold text-lg leading-none"
+          className="ml-3 text-xs text-white/80 hover:text-white"
         >
-          ×
+          ✕
         </button>
       </div>
     </div>
