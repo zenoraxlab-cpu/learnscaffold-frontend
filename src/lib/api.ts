@@ -1,5 +1,3 @@
-// src/lib/api.ts
-
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://learnscaffold-backend-ocr.onrender.com';
@@ -57,7 +55,7 @@ export async function getAnalysisStatus(fileId: string, language: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE LEARNING PLAN (БЕЗ проверки analysis)
+   GENERATE LEARNING PLAN (with delayed + 404)
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -74,39 +72,51 @@ export async function generatePlan(
     }),
   });
 
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Generate failed (${res.status}): ${txt}`);
+  // 1. success 200 (normal or delayed)
+  if (res.status === 200) {
+    const json = await res.json();
+
+    if (json.status === 'delayed') {
+      return {
+        status: 'delayed',
+        message:
+          'Your file requires extended processing. We will email you when it is ready.',
+      };
+    }
+
+    return normalizePlanResponse(json);
   }
 
-  let json: any;
-
-  try {
-    json = await res.json();
-  } catch (e) {
-    console.error('JSON parse error:', e);
-    throw new Error('Invalid JSON from backend');
+  // 2. 404 → анализ ещё не готов
+  if (res.status === 404) {
+    return {
+      status: 'delayed',
+      message:
+        'Your file is still being processed. We will email you when the analysis is ready.',
+    };
   }
 
-  console.log('RAW PLAN RESPONSE:', JSON.stringify(json, null, 2));
+  // 3. other errors
+  const txt = await res.text();
+  throw new Error(`Generate failed (${res.status}): ${txt}`);
+}
 
-  // /generate НЕ возвращает analysis — только { status, days, plan }
+/* ---------------------------------------------------------
+   NORMALIZE PLAN
+--------------------------------------------------------- */
+function normalizePlanResponse(json: any) {
   if (!json.plan) {
     console.error("Missing 'plan' in backend response:", json);
     throw new Error('Backend did not return a learning plan');
   }
 
-  // Нормализуем структуру плана
   let normalizedDays: any[] = [];
 
   if (Array.isArray(json.plan)) {
-    // план сразу как массив
     normalizedDays = json.plan;
   } else if (json.plan && Array.isArray(json.plan.days)) {
-    // { plan: { days: [...] } }
     normalizedDays = json.plan.days;
   } else if (json.plan && typeof json.plan === 'object') {
-    // объект дней → массив
     const values = Object.values(json.plan);
     if (values.length > 0 && typeof values[0] === 'object') {
       normalizedDays = values;
@@ -119,7 +129,6 @@ export async function generatePlan(
   }
 
   json.plan = { days: normalizedDays };
-
   return json;
 }
 
