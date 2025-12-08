@@ -80,6 +80,7 @@ export default function HomePage() {
   const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
   const [editableText, setEditableText] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
 
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [planLanguage, setPlanLanguage] = useState<string>('en');
@@ -222,30 +223,41 @@ export default function HomePage() {
   };
 
   /* GENERATE PLAN */
-  const handleGenerate = async () => {
-    if (!fileId) return;
+const handleGenerate = async () => {
+  if (!fileId) return;
 
-    try {
-      setError(null);
-      setStatus('generating');
+  try {
+    setError(null);
+    setDelayedMessage(null);
+    setStatus('generating');
 
-      const generated = await generatePlan(fileId, days, planLanguage);
+    const generated = await generatePlan(fileId, days, planLanguage);
 
-      if (!generated.plan || !Array.isArray(generated.plan.days)) {
-        console.error('Invalid plan structure:', generated);
-        setStatus('error');
-        return;
-      }
-
-      setPlan(generated);
-      setEditableText(planToText(generated));
-      setStatus('ready');
-    } catch (err) {
-      console.error(err);
-      setError('Error generating plan');
-      setStatus('error');
+    if (generated.status === 'delayed') {
+      setDelayedMessage(generated.message);
+      setStatus('idle');
+      return;
     }
-  };
+
+    if (!generated.plan || !Array.isArray(generated.plan.days)) {
+      console.error('Invalid plan structure:', generated);
+      setStatus('error');
+      return;
+    }
+
+    setPlan(generated);
+    setEditableText(planToText(generated));
+    setStatus('ready');
+  } catch (err) {
+    console.error(err);
+    setError('Error generating plan');
+    setStatus('error');
+  }
+};  // ← ЭТА СКОБКА ОБЯЗАТЕЛЬНА
+
+/* PDF */
+const handleDownloadPdf = async () => {
+
 
   /* PDF */
   const handleDownloadPdf = async () => {
