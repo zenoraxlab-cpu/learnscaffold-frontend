@@ -55,7 +55,7 @@ export async function getAnalysisStatus(fileId: string, language: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE LEARNING PLAN (with delayed + 404)
+   GENERATE LEARNING PLAN (delayed + 404)
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
@@ -72,7 +72,7 @@ export async function generatePlan(
     }),
   });
 
-  // 1. success 200 (normal or delayed)
+  // 1 — backend запустил ручную обработку → НЕ ОШИБКА
   if (res.status === 200) {
     const json = await res.json();
 
@@ -87,7 +87,7 @@ export async function generatePlan(
     return normalizePlanResponse(json);
   }
 
-  // 2. 404 → анализ ещё не готов
+  // 2 — анализа ещё нет → НЕ ОШИБКА
   if (res.status === 404) {
     return {
       status: 'delayed',
@@ -96,7 +96,7 @@ export async function generatePlan(
     };
   }
 
-  // 3. other errors
+  // 3 — ошибка
   const txt = await res.text();
   throw new Error(`Generate failed (${res.status}): ${txt}`);
 }
