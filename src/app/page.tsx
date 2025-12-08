@@ -1,4 +1,4 @@
-// force rebuild 2025-12-07
+// force rebuild 2025-12-08
 
 'use client';
 
@@ -68,6 +68,8 @@ export default function HomePage() {
   >('idle');
 
   const [error, setError] = useState<string | null>(null);
+  const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
+
   const [fileId, setFileId] = useState<string | null>(null);
 
   const [analysis, setAnalysis] = useState<any | null>(null);
@@ -80,7 +82,6 @@ export default function HomePage() {
   const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
   const [editableText, setEditableText] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
 
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [planLanguage, setPlanLanguage] = useState<string>('en');
@@ -137,7 +138,7 @@ export default function HomePage() {
           setStatus('error');
         }
       } catch {
-        // тихо игнорируем временные ошибки
+        // игнорируем временные ошибки
       }
     }, pollInterval);
 
@@ -173,6 +174,7 @@ export default function HomePage() {
     setSelectedFile(file);
 
     setError(null);
+    setDelayedMessage(null);
     setPlan(null);
     setAnalysis(null);
     setFileId(null);
@@ -199,8 +201,6 @@ export default function HomePage() {
         setStatus('analyzing');
 
         const res = await analyze(uploadRes.file_id);
-
-        // backend: { analysis: {...} } или плоско
         const analysisBlock = res.analysis ?? res;
 
         setAnalysis(analysisBlock);
@@ -223,43 +223,39 @@ export default function HomePage() {
   };
 
   /* GENERATE PLAN */
-const handleGenerate = async () => {
-  if (!fileId) return;
+  const handleGenerate = async () => {
+    if (!fileId) return;
 
-  try {
-    setError(null);
-    setDelayedMessage(null);
-    setStatus('generating');
+    try {
+      setError(null);
+      setDelayedMessage(null);
+      setStatus('generating');
 
-    const generated = await generatePlan(fileId, days, planLanguage);
+      const generated = await generatePlan(fileId, days, planLanguage);
 
-    if (generated.status === 'delayed') {
-      setDelayedMessage(generated.message);
-      setStatus('idle');
-      return;
-    }
+      if (generated.status === 'delayed') {
+        setDelayedMessage(generated.message);
+        setStatus('idle');
+        return;
+      }
 
-    if (!generated.plan || !Array.isArray(generated.plan.days)) {
-      console.error('Invalid plan structure:', generated);
+      if (!generated.plan || !Array.isArray(generated.plan.days)) {
+        console.error('Invalid plan structure:', generated);
+        setStatus('error');
+        return;
+      }
+
+      setPlan(generated);
+      setEditableText(planToText(generated));
+      setStatus('ready');
+    } catch (err) {
+      console.error(err);
+      setError('Error generating plan');
       setStatus('error');
-      return;
     }
+  };
 
-    setPlan(generated);
-    setEditableText(planToText(generated));
-    setStatus('ready');
-  } catch (err) {
-    console.error(err);
-    setError('Error generating plan');
-    setStatus('error');
-  }
-};  // ← ЭТА СКОБКА ОБЯЗАТЕЛЬНА
-
-/* PDF */
-const handleDownloadPdf = async () => {
-
-
-  /* PDF */
+  /* PDF DOWNLOAD */
   const handleDownloadPdf = async () => {
     if (!editableText.trim() || !fileId) return;
 
@@ -285,7 +281,7 @@ const handleDownloadPdf = async () => {
     }
   };
 
-  /* UI LABELS — без анимации */
+  /* UI LABELS */
   const statusKey = analysisStatus || status || 'idle';
   const uiLabel = STATUS_LABELS[statusKey] || statusKey;
 
@@ -306,7 +302,7 @@ const handleDownloadPdf = async () => {
           <div className="text-xs text-slate-400">Interface v0.9.0</div>
         </header>
 
-        {/* CARD 1: UPLOAD + STATUS */}
+        {/* CARD: UPLOAD + STATUS */}
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -314,8 +310,8 @@ const handleDownloadPdf = async () => {
                 Upload a textbook or video
               </h1>
               <p className="mt-2 text-sm text-slate-300">
-                The file will be analyzed automatically. You&apos;ll then
-                configure your learning plan and export it to PDF.
+                The file will be analyzed automatically. You will then configure
+                your learning plan and export it.
               </p>
             </div>
 
@@ -323,9 +319,16 @@ const handleDownloadPdf = async () => {
               <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-[11px] text-slate-300">
                 {uiLabel}
               </span>
+
               {status === 'generating' && (
                 <span className="mt-1 text-[10px] text-slate-500">
-                  Generating plan… {elapsedSeconds}s
+                  Generating… {elapsedSeconds}s
+                </span>
+              )}
+
+              {delayedMessage && (
+                <span className="mt-2 text-[11px] text-yellow-400 max-w-xs text-right">
+                  {delayedMessage}
                 </span>
               )}
             </div>
@@ -351,6 +354,7 @@ const handleDownloadPdf = async () => {
                 File ID: {fileId}
               </span>
             )}
+
             {selectedFile && (
               <span className="truncate rounded-full border border-slate-700 bg-slate-900/80 px-2 py-1">
                 {selectedFile.name}
@@ -359,10 +363,10 @@ const handleDownloadPdf = async () => {
           </div>
         </section>
 
-        {/* CARD ROW: DOCUMENT SUMMARY + GENERATE SETTINGS */}
+        {/* CARD ROW: SUMMARY + SETTINGS */}
         {analysis && (
           <section className="mt-6 grid gap-4 md:grid-cols-2">
-            {/* DOCUMENT SUMMARY CARD */}
+            {/* SUMMARY */}
             <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
               <h2 className="text-sm font-semibold tracking-wide text-slate-100">
                 DOCUMENT SUMMARY
@@ -420,7 +424,7 @@ const handleDownloadPdf = async () => {
               )}
             </div>
 
-            {/* GENERATE SETTINGS CARD */}
+            {/* GENERATE SETTINGS */}
             <div className="rounded-3xl border border-emerald-600/40 bg-emerald-950/20 p-5">
               <h2 className="text-sm font-semibold tracking-wide text-emerald-300">
                 GENERATE LEARNING PLAN
@@ -453,7 +457,7 @@ const handleDownloadPdf = async () => {
                 </div>
 
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Recommended days based on analysis:{' '}
+                  Recommended days:{' '}
                   <span className="text-slate-200">
                     {recommendedDays ?? analysis.recommended_days ?? '—'}
                   </span>
@@ -468,31 +472,35 @@ const handleDownloadPdf = async () => {
                 {status === 'generating' ? (
                   <>
                     <span className="inline-block h-3 w-3 animate-spin rounded-full border border-black border-b-transparent" />
-                    Generating plan…
+                    Generating…
                   </>
                 ) : (
                   'Generate plan'
                 )}
               </button>
+
+              {delayedMessage && (
+                <p className="mt-3 text-xs text-yellow-400">{delayedMessage}</p>
+              )}
             </div>
           </section>
         )}
 
-        {/* STUDY PLAN CARD LIST */}
+        {/* STUDY PLAN RESULT */}
         {plan && (
           <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/20 p-5">
             <StudyPlanViewer analysis={analysis} plan={plan.plan} />
           </section>
         )}
 
-        {/* EDITABLE TEXT AREA */}
+        {/* EDITOR + PDF */}
         {plan && (
           <section className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-5">
             <h2 className="text-sm font-semibold tracking-wide text-slate-100">
               EDITABLE TEXT (EXPORT TO PDF)
             </h2>
             <p className="mt-1 text-[11px] text-slate-400">
-              You can manually edit the generated plan text before exporting.
+              You can modify the generated plan before exporting.
             </p>
 
             <textarea
@@ -523,6 +531,7 @@ const handleDownloadPdf = async () => {
 /* ---------------------------------------------------------
    Helper
 --------------------------------------------------------- */
+
 function planToText(plan: StudyPlanResponse): string {
   if (!plan?.plan?.days) return '';
 
