@@ -19,29 +19,33 @@ import ProgressBar from '@/components/ProgressBar';
 import type { StudyPlanResponse } from '@/types/studyplan';
 
 /* ---------------------------------------------------------
-   USER-FRIENDLY ERROR
+   SOFT USER MESSAGE FOR COMPLEX FILES
 --------------------------------------------------------- */
-const USER_FRIENDLY_ERROR =
-  'This document requires extended manual processing. You will receive the result by email.';
+const FRIENDLY_INFO =
+  'This document requires additional processing time. You will receive an update by email.';
 
 /* ---------------------------------------------------------
-   UNIVERSAL ERROR POPUP (toast)
+   MODAL ERROR (CALM + NEUTRAL)
 --------------------------------------------------------- */
-const ErrorPopup: React.FC<{ message: string | null; onClose: () => void }> = ({
+const ModalInfo: React.FC<{ message: string | null; onReset: () => void }> = ({
   message,
-  onClose,
+  onReset,
 }) => {
   if (!message) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 rounded-xl bg-red-600/90 px-4 py-3 text-sm shadow-lg">
-      <div className="flex items-center justify-between gap-4">
-        <span>{message}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur">
+      <div className="rounded-3xl bg-slate-900 border border-white/10 p-8 shadow-xl max-w-sm w-full text-center">
+        <h2 className="text-lg font-semibold text-slate-100 mb-2">
+          Additional Processing Required
+        </h2>
+        <p className="text-sm text-slate-300 mb-6">{message}</p>
+
         <button
-          onClick={onClose}
-          className="ml-3 text-xs text-white/80 hover:text-white"
+          onClick={onReset}
+          className="w-full rounded-2xl bg-emerald-500 text-black font-semibold py-2 transition hover:bg-emerald-400"
         >
-          ✕
+          Upload another file
         </button>
       </div>
     </div>
@@ -97,8 +101,7 @@ export default function HomePage() {
     'idle' | 'uploading' | 'analyzing' | 'generating' | 'ready' | 'error'
   >('idle');
 
-  const [error, setError] = useState<string | null>(null);
-  const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
 
   const [fileId, setFileId] = useState<string | null>(null);
 
@@ -118,6 +121,22 @@ export default function HomePage() {
 
   const isBusy =
     status === 'uploading' || status === 'analyzing' || status === 'generating';
+
+  /* RESET EVERYTHING */
+  const resetAll = () => {
+    setSelectedFile(null);
+    setStatus('idle');
+    setModalMessage(null);
+    setFileId(null);
+    setAnalysis(null);
+    setPlan(null);
+    setEditableText('');
+    setRecommendedDays(null);
+    setDays(7);
+    setAnalysisStatus(null);
+    setAnalysisProgress(0);
+    setPlanLanguage('en');
+  };
 
   /* TIMER FOR GENERATING */
   useEffect(() => {
@@ -165,8 +184,8 @@ export default function HomePage() {
 
         if (st?.status === 'error') {
           clearInterval(interval);
+          setModalMessage(FRIENDLY_INFO);
           setStatus('error');
-          setError(USER_FRIENDLY_ERROR);
         }
       } catch {
         // тихо игнорируем
@@ -200,12 +219,10 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [status, analysisStatus]);
 
-  /* FILE UPLOAD */
+  /* FILE UPLOAD AND ANALYSIS */
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
-
-    setError(null);
-    setDelayedMessage(null);
+    setModalMessage(null);
     setPlan(null);
     setAnalysis(null);
     setFileId(null);
@@ -247,7 +264,7 @@ export default function HomePage() {
         setStatus('idle');
       } catch (err) {
         console.error(err);
-        setError(USER_FRIENDLY_ERROR);
+        setModalMessage(FRIENDLY_INFO);
         setStatus('error');
       }
     })();
@@ -258,21 +275,20 @@ export default function HomePage() {
     if (!fileId) return;
 
     try {
-      setError(null);
-      setDelayedMessage(null);
+      setModalMessage(null);
       setStatus('generating');
 
       const generated = await generatePlan(fileId, days, planLanguage);
 
       if (generated.status === 'delayed') {
-        setDelayedMessage(generated.message);
+        setModalMessage(FRIENDLY_INFO);
         setStatus('idle');
         return;
       }
 
       if (!generated.plan || !Array.isArray(generated.plan.days)) {
         console.error('Invalid plan structure:', generated);
-        setError(USER_FRIENDLY_ERROR);
+        setModalMessage(FRIENDLY_INFO);
         setStatus('error');
         return;
       }
@@ -282,7 +298,7 @@ export default function HomePage() {
       setStatus('ready');
     } catch (err) {
       console.error(err);
-      setError(USER_FRIENDLY_ERROR);
+      setModalMessage(FRIENDLY_INFO);
       setStatus('error');
     }
   };
@@ -307,20 +323,20 @@ export default function HomePage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      setError(USER_FRIENDLY_ERROR);
+      setModalMessage(FRIENDLY_INFO);
     } finally {
       setIsDownloading(false);
     }
   };
 
-  /* UI LABELS */
+  /* UI LABEL */
   const statusKey = analysisStatus || status || 'idle';
   const uiLabel = STATUS_LABELS[statusKey] || statusKey;
 
   /* UI */
   return (
     <>
-      <ErrorPopup message={error} onClose={() => setError(null)} />
+      <ModalInfo message={modalMessage} onReset={resetAll} />
 
       <main className="min-h-screen bg-slate-950 text-slate-50">
         <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-8">
@@ -338,7 +354,7 @@ export default function HomePage() {
             <div className="text-xs text-slate-400">Interface v0.9.0</div>
           </header>
 
-          {/* CARD: UPLOAD + STATUS */}
+          {/* UPLOAD CARD */}
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -359,12 +375,6 @@ export default function HomePage() {
                 {status === 'generating' && (
                   <span className="mt-1 text-[10px] text-slate-500">
                     Generating… {elapsedSeconds}s
-                  </span>
-                )}
-
-                {delayedMessage && (
-                  <span className="mt-2 text-[11px] text-yellow-400 max-w-xs text-right">
-                    {delayedMessage}
                   </span>
                 )}
               </div>
@@ -397,10 +407,10 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* DOCUMENT SUMMARY + GENERATE SETTINGS */}
+          {/* SUMMARY + SETTINGS */}
           {analysis && (
             <section className="mt-6 grid gap-4 md:grid-cols-2">
-              {/* DOCUMENT SUMMARY */}
+              {/* SUMMARY */}
               <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
                 <h2 className="text-sm font-semibold tracking-wide text-slate-100">
                   DOCUMENT SUMMARY
@@ -458,7 +468,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* GENERATE SETTINGS */}
+              {/* SETTINGS */}
               <div className="rounded-3xl border border-emerald-600/40 bg-emerald-950/20 p-5">
                 <h2 className="text-sm font-semibold tracking-wide text-emerald-300">
                   GENERATE LEARNING PLAN
@@ -512,17 +522,11 @@ export default function HomePage() {
                     'Generate plan'
                   )}
                 </button>
-
-                {delayedMessage && (
-                  <p className="mt-3 text-xs text-yellow-400">
-                    {delayedMessage}
-                  </p>
-                )}
               </div>
             </section>
           )}
 
-          {/* STUDY PLAN RESULT */}
+          {/* RESULTS VIEWER */}
           {plan && (
             <section className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-950/20 p-5">
               <StudyPlanViewer analysis={analysis} plan={plan.plan} />
