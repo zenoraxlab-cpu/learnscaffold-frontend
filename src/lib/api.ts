@@ -1,6 +1,7 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://learnscaffold-backend-ocr.onrender.com';
+// ---------------------------------------------------------
+// API BASE URL
+// ---------------------------------------------------------
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /* ---------------------------------------------------------
    UPLOAD FILE
@@ -55,14 +56,15 @@ export async function getAnalysisStatus(fileId: string, language: string) {
 }
 
 /* ---------------------------------------------------------
-   GENERATE LEARNING PLAN (delayed + 404)
+   GENERATE LEARNING PLAN — ИСПРАВЛЕНО: правильный путь
 --------------------------------------------------------- */
 export async function generatePlan(
   fileId: string,
   days: number,
   language: string,
 ) {
-  const res = await fetch(`${API_URL}/generate/`, {
+  const res = await fetch(`${API_URL}/generate/generate`, {
+    // ← было /generate/, стало /generate/generate
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -72,7 +74,6 @@ export async function generatePlan(
     }),
   });
 
-  // 1 — backend запустил ручную обработку → НЕ ОШИБКА
   if (res.status === 200) {
     const json = await res.json();
 
@@ -87,7 +88,6 @@ export async function generatePlan(
     return normalizePlanResponse(json);
   }
 
-  // 2 — анализа ещё нет → НЕ ОШИБКА
   if (res.status === 404) {
     return {
       status: 'delayed',
@@ -96,7 +96,6 @@ export async function generatePlan(
     };
   }
 
-  // 3 — ошибка
   const txt = await res.text();
   throw new Error(`Generate failed (${res.status}): ${txt}`);
 }
